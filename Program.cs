@@ -102,6 +102,7 @@ class BCATracker
     const int OFF_ARENAGS_CURRENT_GAMESTATE = 0x369;    // EGameState byte
     const int OFF_ARENAGS_CURRENT_GAMEMODE = 0x3B0;     // EGameMode byte
     const int OFF_ARENAGS_CURRENT_MAP = 0x3E8;          // FName
+    const int OFF_ARENAGS_GAMETIME = 0x340;             // double (seconds elapsed)
 
     // Working pointer chains for local player from previous session
     static readonly long BASE_ENEMY_LIVES = 0x07C09D80;
@@ -121,8 +122,57 @@ class BCATracker
     static readonly string[] GAMEMODES = { "Default", "Tuto", "Training", "Backup3v3", "BackupFFA", "GoldenCore3v3", "TestMap", "Checkpoint", "Autotest", "CoopVSAI", "CustomGamemode", "Quickplay", "First_Match_VS_AI" };
 
     // ============================================================
-    // KILL FEED
+    // LOBBY DATA
     // ============================================================
+
+    class LobbyData
+    {
+        public string MapName = "Unknown";
+        public string ModeName = "Unknown";
+        public int BotCountT1;
+        public int BotCountT2;
+    }
+
+    // FName index → map display name (assigned at runtime, stable within session)
+    static readonly Dictionary<int, string> MAP_FNAMES = new Dictionary<int, string>
+    {
+        { 0x5BE09, "Trinity Island" },
+        { 0x2DEAF, "Lost Complex" },
+        { 0x59D6C, "Singularity" },
+        { 0x2DEA8, "Shroomworld" },
+        { 0x404EF, "Twilight Path" },
+    };
+    // Nest's FName index is assigned at runtime by the DLL — we discover it dynamically
+    static int nestFNameIndex = 0;
+
+    static readonly Dictionary<int, string> MODE_FNAMES = new Dictionary<int, string>
+    {
+        { 0x16BE22, "Backup 3v3" },
+        { 0x16DACC, "Q-Ball" },
+    };
+
+    static LobbyData ReadLobbyData(IntPtr handle, long gameState)
+    {
+        var data = new LobbyData();
+
+        int arenaFName = ReadInt(handle, gameState + OFF_CUSTOMGS_ARENA_ROWNAME);
+        int modeFName = ReadInt(handle, gameState + OFF_CUSTOMGS_GAMEMODE_ROWNAME);
+        data.BotCountT1 = ReadInt(handle, gameState + 0x390);
+        data.BotCountT2 = ReadInt(handle, gameState + 0x394);
+
+        if (MAP_FNAMES.TryGetValue(arenaFName, out string mapName))
+            data.MapName = mapName;
+        else if (arenaFName != 0)
+            data.MapName = nestFNameIndex != 0 && arenaFName == nestFNameIndex
+                ? "Enkidu Nest" : $"Unknown (0x{arenaFName:X})";
+
+        if (MODE_FNAMES.TryGetValue(modeFName, out string modeName))
+            data.ModeName = modeName;
+        else if (modeFName != 0)
+            data.ModeName = $"Unknown (0x{modeFName:X})";
+
+        return data;
+    }
 
     class KillFeedEntry
     {
@@ -137,7 +187,6 @@ class BCATracker
     // Previous-tick snapshot of each player's K/D so we can detect changes
     static Dictionary<long, (int kills, int deaths)> prevPlayerStats = new Dictionary<long, (int, int)>();
     static List<KillFeedEntry> killFeed = new List<KillFeedEntry>();
-    static List<string> debugLog = new List<string>();
     const int KILL_FEED_MAX = 10;
     static readonly string[] GAME_STATES = {
         "MainMenu",         // 0
@@ -270,7 +319,7 @@ class BCATracker
                 // Resolve GameState object
                 long gameState = ResolveGameState(handle, moduleBase);
 
-                // Resolve our own player state pointer (used to mark "you" in displays and kill feed)
+                // Resolve our own player state pointer
                 long myStatePtr = ResolveLocalPlayerStatePtr(handle, moduleBase);
 
                 // Read player array
@@ -284,26 +333,43 @@ class BCATracker
                 byte gameStateEnum = 0;
                 byte gameModeEnum = 0;
                 bool inMatch = false;
+                bool isPostMatch = false;
+                bool isLobby = false;
+                double gameTime = 0;
+                LobbyData lobbyData = null;
+
                 if (gameState != 0)
                 {
                     byte rawState = ReadByte(handle, gameState + OFF_ARENAGS_CURRENT_GAMESTATE);
                     byte rawMode = ReadByte(handle, gameState + OFF_ARENAGS_CURRENT_GAMEMODE);
+
                     if (rawState <= 15 && players.Count > 0)
                     {
-                        inMatch = true;
                         gameStateEnum = rawState;
                         gameModeEnum = rawMode;
+                        gameTime = ReadDouble(handle, gameState + OFF_ARENAGS_GAMETIME);
+
+                        if (rawState == 9) inMatch = true;                        // Playing
+                        else if (rawState >= 4 && rawState <= 8) inMatch = true;  // Loading → Countdown also show live data
+                        else if (rawState >= 10 && rawState <= 13) isPostMatch = true; // EndGame → Leaderboard
+                    }
+                    else
+                    {
+                        // CustomGameGS — lobby
+                        isLobby = true;
+                        lobbyData = ReadLobbyData(handle, gameState);
                     }
                 }
 
-                // Detect kills via HitHistory (only in-match)
-                if (inMatch) DetectKills(handle, players, myStatePtr);
+                // Kill feed only during active play
+                if (inMatch && gameStateEnum == 9) DetectKills(handle, players, myStatePtr);
 
                 // Read match lives
                 int myLives = ReadChain4(handle, moduleBase, BASE_MY_LIVES, OFF_MY_LIVES);
                 int enemyLives = ReadChain4(handle, moduleBase, BASE_ENEMY_LIVES, OFF_ENEMY_LIVES);
 
-                Draw(players, myLives, enemyLives, gameStateEnum, gameModeEnum, inMatch);
+                Draw(players, myLives, enemyLives, gameStateEnum, gameModeEnum,
+                     inMatch, isPostMatch, isLobby, lobbyData, gameTime);
 
                 Thread.Sleep(500);
             }
@@ -391,9 +457,6 @@ class BCATracker
     // when a player dies, the TargetID in their death record IS that player's instigator-ID.
     static Dictionary<int, long> instigatorIdToStatePtr = new Dictionary<int, long>();
 
-    // When true, prints the raw bytes of each new hit entry to help debug offsets
-    const bool DEBUG_HITS = true;
-
     static PlayerInfo FindPlayerByInstigatorId(int id, List<PlayerInfo> players, long myStatePtr)
     {
         // The local player has a special case: when they kill someone, the InstigatorID
@@ -469,17 +532,6 @@ class BCATracker
                 if (historyCount > 0 && historyData != 0)
                 {
                     long hitAddr = historyData + (historyCount - 1) * SIZEOF_HITINFO;
-
-                    if (DEBUG_HITS)
-                    {
-                        byte[] rawHit = new byte[SIZEOF_HITINFO];
-                        ReadProcessMemory(handle, (IntPtr)hitAddr, rawHit, SIZEOF_HITINFO, out _);
-                        var sb = new StringBuilder();
-                        sb.Append($"[DEBUG] Victim={victim.Name} killed. Raw FSHitInfo: ");
-                        for (int bi = 0; bi < 16; bi++) sb.Append(rawHit[bi].ToString("X2") + " ");
-                        debugLog.Add(sb.ToString());
-                        if (debugLog.Count > 10) debugLog.RemoveAt(0);
-                    }
 
                     int instigatorId = ReadInt(handle, hitAddr + OFF_HIT_INSTIGATOR_ID);
                     byte weapon = ReadByte(handle, hitAddr + OFF_HIT_WEAPON);
@@ -660,191 +712,257 @@ class BCATracker
     // RENDERING
     // ============================================================
 
-    static void Draw(List<PlayerInfo> players, int myLives, int enemyLives, byte gameStateEnum, byte gameModeEnum, bool inMatch)
+    static void Draw(List<PlayerInfo> players, int myLives, int enemyLives,
+                     byte gameStateEnum, byte gameModeEnum,
+                     bool inMatch, bool isPostMatch, bool isLobby,
+                     LobbyData lobbyData, double gameTime)
     {
         Console.Clear();
 
+        // Header
         Console.ForegroundColor = ConsoleColor.DarkMagenta;
         Console.WriteLine("  ╔════════════════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("  ║                     BCA TRACKER — ALPHA V0.11                                  ║");
+        Console.WriteLine("  ║                      BCA TRACKER — ALPHA V0.12                                 ║");
         Console.WriteLine("  ╚════════════════════════════════════════════════════════════════════════════════╝");
         Console.ResetColor();
         Console.WriteLine();
 
-        // Match state line
-        Console.ForegroundColor = ConsoleColor.White;
-        if (inMatch)
+        // ── LOBBY VIEW ─────────────────────────────────────────────────────────────────
+        if (isLobby && lobbyData != null)
+        {
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine("  CUSTOM GAME LOBBY");
+            Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("  " + new string('─', 40));
+            Console.ResetColor();
+            Console.Write("  Map:  "); Console.ForegroundColor = ConsoleColor.Cyan; Console.WriteLine(lobbyData.MapName); Console.ResetColor();
+            Console.Write("  Mode: "); Console.ForegroundColor = ConsoleColor.Yellow; Console.WriteLine(lobbyData.ModeName); Console.ResetColor();
+            Console.Write("  Bots: "); Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"Team 1: {lobbyData.BotCountT1}   Team 2: {lobbyData.BotCountT2}");
+            Console.ResetColor();
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"  Updated: {DateTime.Now:HH:mm:ss}");
+            Console.ResetColor();
+            return;
+        }
+
+        // ── WAITING / MAIN MENU ────────────────────────────────────────────────────────
+        if (!inMatch && !isPostMatch && !isLobby)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("  Waiting for match...");
+            Console.WriteLine($"  Updated: {DateTime.Now:HH:mm:ss}");
+            Console.ResetColor();
+            return;
+        }
+
+        // ── POST-MATCH SUMMARY (states 10-13) ─────────────────────────────────────────
+        if (isPostMatch)
+        {
+            string stateName = gameStateEnum < GAME_STATES.Length ? GAME_STATES[gameStateEnum] : "?";
+            string modeName = gameModeEnum < GAMEMODES.Length ? GAMEMODES[gameModeEnum] : "?";
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine($"  MATCH SUMMARY — {modeName}   [{stateName}]");
+            Console.ResetColor();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("  " + new string('─', 110));
+            Console.ResetColor();
+
+            // Sort all players by kills desc
+            var sorted = new List<PlayerInfo>(players);
+            sorted.Sort((a, b) => b.Kills != a.Kills ? b.Kills.CompareTo(a.Kills) : a.Deaths.CompareTo(b.Deaths));
+
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine("  " + "Name".PadRight(20) + "Team".PadRight(6) + "K/D/A".PadRight(12) +
+                              "Acc".PadRight(7) + "DMG".PadRight(8) + "HEAL".PadRight(8) + "Dashes".PadRight(8) +
+                              "AbilUses".PadRight(10) + "ShldPick".PadRight(10) +
+                              "Alive".PadRight(10) + "Result");
+            Console.WriteLine("  " + new string('─', 107));
+            Console.ResetColor();
+
+            foreach (var p in sorted)
+            {
+                string nameTag = p.IsBot ? $"[BOT]{p.Name}" : p.Name;
+                if (p.IsLocal) nameTag = "*" + nameTag;
+                if (nameTag.Length > 19) nameTag = nameTag.Substring(0, 19);
+
+                string kda = $"{p.Kills}/{p.Deaths}/{p.Assists}";
+                string acc = $"{p.Accuracy:F0}%";
+                string dmg = p.Damage > 0 ? p.Damage.ToString("F0") : "-";
+                string heal = p.Heal > 0 ? p.Heal.ToString("F0") : "-";
+                string alive = p.TimeAlive > 0 ? $"{(int)p.TimeAlive / 60}m{(int)p.TimeAlive % 60}s" : "-";
+                string result = p.IsWinner ? "WIN" : "LOSS";
+
+                Console.ForegroundColor = p.IsBot ? ConsoleColor.DarkGray
+                                        : p.IsWinner ? ConsoleColor.Green : ConsoleColor.White;
+                Console.Write("  " + nameTag.PadRight(20));
+                Console.ResetColor();
+                Console.ForegroundColor = p.Team == 0 ? ConsoleColor.Cyan : ConsoleColor.Red;
+                Console.Write($"T{p.Team}".PadRight(6));
+                Console.ResetColor();
+                Console.Write(kda.PadRight(12));
+                Console.Write(acc.PadRight(7));
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write(dmg.PadRight(8));
+                Console.ResetColor();
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write(heal.PadRight(8));
+                Console.ResetColor();
+                Console.Write($"{p.Dashes}".PadRight(8));
+                Console.Write($"{p.AbilitiesUsed}".PadRight(10));
+                Console.Write($"{p.ShieldPickups}".PadRight(10));
+                Console.Write(alive.PadRight(10));
+                Console.ForegroundColor = p.IsWinner ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.Write(result);
+                Console.ResetColor();
+                Console.WriteLine();
+            }
+
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"  Updated: {DateTime.Now:HH:mm:ss}");
+            Console.ResetColor();
+            return;
+        }
+
+        // ── IN-MATCH VIEW ──────────────────────────────────────────────────────────────
         {
             string stateName = gameStateEnum < GAME_STATES.Length ? GAME_STATES[gameStateEnum] : "Transition";
             string modeName = gameModeEnum < GAMEMODES.Length ? GAMEMODES[gameModeEnum] : "?";
-            Console.WriteLine($"  Mode: {modeName} ({gameModeEnum})    State: {stateName} ({gameStateEnum})");
-        }
-        else
-        {
-            Console.WriteLine("  In lobby / main menu");
-        }
-        Console.ResetColor();
+            string timer = gameTime > 0 ? $"{(int)gameTime / 60}:{(int)gameTime % 60:D2}" : "--:--";
 
-        // Lives (note: enemy lives can go negative when all respawns consumed but players still alive)
-        string myLivesStr = myLives == -1 ? "???" : myLives.ToString();
-        string enemyLivesStr = enemyLives == -1 ? "???" : enemyLives.ToString();
-        Console.Write("  My Team Lives: ");
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.Write(myLivesStr.PadRight(8));
-        Console.ResetColor();
-        Console.Write("Enemy Lives: ");
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine(enemyLivesStr);
-        Console.ResetColor();
-        Console.WriteLine();
-
-        // Players table
-        if (players.Count == 0)
-        {
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write($"  {modeName}");
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine("  No players detected (not in a match?)");
+            Console.Write($"  [{stateName}]");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine($"  ⏱ {timer}");
             Console.ResetColor();
-        }
-        else
-        {
-            // Group by team
-            var teams = new Dictionary<int, List<PlayerInfo>>();
-            foreach (var p in players)
+
+            // Lives
+            string myLivesStr = myLives == -1 ? "???" : myLives.ToString();
+            string enemyLivesStr = enemyLives == -1 ? "???" : enemyLives.ToString();
+            Console.Write("  My Team Lives: ");
+            Console.ForegroundColor = ConsoleColor.Cyan; Console.Write(myLivesStr.PadRight(8)); Console.ResetColor();
+            Console.Write("Enemy Lives: ");
+            Console.ForegroundColor = ConsoleColor.Red; Console.WriteLine(enemyLivesStr); Console.ResetColor();
+            Console.WriteLine();
+
+            if (players.Count == 0)
             {
-                if (!teams.ContainsKey(p.Team)) teams[p.Team] = new List<PlayerInfo>();
-                teams[p.Team].Add(p);
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine("  No players detected.");
+                Console.ResetColor();
+            }
+            else
+            {
+                var teams = new Dictionary<int, List<PlayerInfo>>();
+                foreach (var p in players)
+                {
+                    if (!teams.ContainsKey(p.Team)) teams[p.Team] = new List<PlayerInfo>();
+                    teams[p.Team].Add(p);
+                }
+                var teamIds = new List<int>(teams.Keys);
+                teamIds.Sort();
+
+                foreach (var teamId in teamIds)
+                {
+                    Console.ForegroundColor = teamId == 0 ? ConsoleColor.Cyan : ConsoleColor.Red;
+                    Console.WriteLine($"  TEAM {teamId}");
+                    Console.ResetColor();
+
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine("  " + "Name".PadRight(20) + "K/D/A".PadRight(12) + "KD".PadRight(7) +
+                                      "Acc".PadRight(7) + "Weapon".PadRight(12) + "Ability".PadRight(18) +
+                                      "Module".PadRight(14) + "DMG".PadRight(8) + "HEAL");
+                    Console.WriteLine("  " + new string('─', 103));
+                    Console.ResetColor();
+
+                    foreach (var p in teams[teamId])
+                    {
+                        string nameTag = p.IsBot ? $"[BOT{p.BotLevel}]{p.Name}" : p.Name;
+                        if (p.IsLocal) nameTag = "*" + nameTag;
+                        if (p.IsHost && !p.IsLocal) nameTag = "H:" + nameTag;
+                        if (nameTag.Length > 19) nameTag = nameTag.Substring(0, 19);
+
+                        string kda = $"{p.Kills}/{p.Deaths}/{p.Assists}";
+                        string kd = p.KDRatio.ToString("F2");
+                        string acc = $"{p.Accuracy:F0}%";
+                        string dmg = p.Damage > 0 ? p.Damage.ToString("F0") : "-";
+                        string heal = p.Heal > 0 ? p.Heal.ToString("F0") : "-";
+
+                        // Row 1: main stats
+                        Console.ForegroundColor = p.IsBot ? ConsoleColor.DarkGray : ConsoleColor.White;
+                        Console.Write("  " + nameTag.PadRight(20)); Console.ResetColor();
+                        Console.Write(kda.PadRight(12));
+                        Console.ForegroundColor = p.KDRatio >= 1 ? ConsoleColor.Green : ConsoleColor.Red;
+                        Console.Write(kd.PadRight(7)); Console.ResetColor();
+                        Console.Write(acc.PadRight(7));
+                        Console.ForegroundColor = ConsoleColor.Yellow; Console.Write(p.WeaponName.PadRight(12)); Console.ResetColor();
+                        Console.ForegroundColor = ConsoleColor.Magenta; Console.Write(p.AbilityName.PadRight(18)); Console.ResetColor();
+                        Console.ForegroundColor = ConsoleColor.Cyan; Console.Write(p.ModuleName.PadRight(14)); Console.ResetColor();
+                        Console.ForegroundColor = ConsoleColor.Red; Console.Write(dmg.PadRight(8)); Console.ResetColor();
+                        Console.ForegroundColor = ConsoleColor.Green; Console.Write(heal); Console.ResetColor();
+                        Console.WriteLine();
+
+                        // Row 2: extended stats
+                        string timeAlive = p.TimeAlive > 0 ? $"{(int)p.TimeAlive / 60}m{(int)p.TimeAlive % 60}s" : "-";
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine(
+                            $"  {"".PadRight(20)}" +
+                            $"Dashes:{p.Dashes,-5} " +
+                            $"Jumps:{p.Jumps,-6} " +
+                            $"AbilUses:{p.AbilitiesUsed,-5} " +
+                            $"ShldPick:{p.ShieldPickups,-5} " +
+                            $"Impulse:{p.ImpulseReceived.ToString("F0"),-8} " +
+                            $"GravCtrl:{p.GravityDuration.ToString("F0"),0}s " +
+                            $"Alive:{timeAlive}"
+                        );
+                        Console.ResetColor();
+                    }
+                    Console.WriteLine();
+                }
             }
 
-            var teamIds = new List<int>(teams.Keys);
-            teamIds.Sort();
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.WriteLine($"  Updated: {DateTime.Now:HH:mm:ss}    Players: {players.Count}");
+            Console.ResetColor();
 
-            foreach (var teamId in teamIds)
+            // Kill feed
+            if (killFeed.Count > 0)
             {
-                Console.ForegroundColor = teamId == 0 ? ConsoleColor.Cyan : ConsoleColor.Red;
-                Console.WriteLine($"  TEAM {teamId}");
+                Console.WriteLine();
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine("  KILL FEED");
                 Console.ResetColor();
-
-                // Header
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine("  " + "Name".PadRight(20) + "K/D/A".PadRight(12) + "KD".PadRight(7) + "Acc".PadRight(7) + "Weapon".PadRight(12) + "Ability".PadRight(18) + "Module".PadRight(14) + "DMG".PadRight(8) + "HEAL");
-                Console.WriteLine("  " + new string('─', 103));
+                Console.WriteLine("  " + new string('─', 60));
                 Console.ResetColor();
 
-                foreach (var p in teams[teamId])
+                for (int i = killFeed.Count - 1; i >= 0; i--)
                 {
-                    string nameTag = p.Name;
-                    if (p.IsBot) nameTag = $"[BOT{p.BotLevel}]" + p.Name;
-                    if (p.IsLocal) nameTag = "*" + nameTag;
-                    if (p.IsHost && !p.IsLocal) nameTag = "H:" + nameTag;
-                    if (nameTag.Length > 19) nameTag = nameTag.Substring(0, 19);
-
-                    string kda = $"{p.Kills}/{p.Deaths}/{p.Assists}";
-                    string kd = p.KDRatio.ToString("F2");
-                    string acc = $"{p.Accuracy:F0}%";
-                    string dmg = p.Damage > 0 ? p.Damage.ToString("F0") : "-";
-                    string heal = p.Heal > 0 ? p.Heal.ToString("F0") : "-";
-                    string winner = p.IsWinner ? " ★WIN" : "";
-
-                    // Row 1: name + core combat stats
-                    Console.ForegroundColor = p.IsBot ? ConsoleColor.DarkGray : ConsoleColor.White;
-                    Console.Write("  " + nameTag.PadRight(20));
-                    Console.ResetColor();
-                    Console.Write(kda.PadRight(12));
-                    Console.ForegroundColor = p.KDRatio >= 1 ? ConsoleColor.Green : ConsoleColor.Red;
-                    Console.Write(kd.PadRight(7));
-                    Console.ResetColor();
-                    Console.Write(acc.PadRight(7));
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Write(p.WeaponName.PadRight(12));
-                    Console.ResetColor();
-                    Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.Write(p.AbilityName.PadRight(18));
-                    Console.ResetColor();
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Write(p.ModuleName.PadRight(14));
-                    Console.ResetColor();
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Write(dmg.PadRight(8));
-                    Console.ResetColor();
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write(heal);
-                    if (winner != "") { Console.ForegroundColor = ConsoleColor.Yellow; Console.Write(winner); }
-                    Console.WriteLine();
-                    Console.ResetColor();
-
-                    // Row 2: extended stats (indented, smaller)
-                    string timeAlive = p.TimeAlive > 0 ? $"{(int)p.TimeAlive / 60}m{(int)p.TimeAlive % 60}s" : "-";
-                    string kdascore = p.KDAScore > 0 ? p.KDAScore.ToString("F1") : "-";
+                    var k = killFeed[i];
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine(
-                        $"  {"".PadRight(20)}" +
-                        $"Dashes:{p.Dashes,-5} " +
-                        $"Jumps:{p.Jumps,-6} " +
-                        $"AbilUses:{p.AbilitiesUsed,-5} " +
-                        $"ShldPick:{p.ShieldPickups,-5} " +
-                        $"Impulse:{p.ImpulseReceived:F0,-8} " +
-                        $"GravCtrl:{p.GravityDuration:F0}s " +
-                        $"Alive:{timeAlive,-8} " +
-                        $"KDAScore:{kdascore}"
-                    );
+                    Console.Write($"  [{k.Time:HH:mm:ss}] ");
+                    Console.ForegroundColor = k.KillerTeam == 0 ? ConsoleColor.Cyan
+                                             : k.KillerTeam == 1 ? ConsoleColor.Red
+                                             : ConsoleColor.DarkGray;
+                    Console.Write(k.KillerName);
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("  [");
+                    Console.ForegroundColor = k.IsAbilityKill ? ConsoleColor.Magenta : ConsoleColor.Yellow;
+                    Console.Write(k.Cause);
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("]  ");
+                    Console.ForegroundColor = k.KillerTeam == 0 ? ConsoleColor.Red
+                                             : k.KillerTeam == 1 ? ConsoleColor.Cyan
+                                             : ConsoleColor.White;
+                    Console.WriteLine(k.VictimName);
                     Console.ResetColor();
                 }
-                Console.WriteLine();
-            }
-        }
-
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"  Updated: {DateTime.Now:HH:mm:ss}    Players: {players.Count}");
-        Console.WriteLine("  Note: Enemy lives can go negative when lives are spent but players are still alive.");
-        Console.ResetColor();
-
-        // Kill feed
-        if (killFeed.Count > 0)
-        {
-            Console.WriteLine();
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("  KILL FEED");
-            Console.ResetColor();
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine("  " + new string('─', 60));
-            Console.ResetColor();
-
-            // Show newest at the top
-            for (int i = killFeed.Count - 1; i >= 0; i--)
-            {
-                var k = killFeed[i];
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"  [{k.Time:HH:mm:ss}] ");
-                Console.ForegroundColor = k.KillerTeam == 0 ? ConsoleColor.Cyan
-                                         : k.KillerTeam == 1 ? ConsoleColor.Red
-                                         : ConsoleColor.DarkGray;
-                Console.Write(k.KillerName);
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write("  [");
-                Console.ForegroundColor = k.IsAbilityKill ? ConsoleColor.Magenta : ConsoleColor.Yellow;
-                Console.Write(k.Cause);
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write("]  ");
-                Console.ForegroundColor = k.KillerTeam == 0 ? ConsoleColor.Red
-                                         : k.KillerTeam == 1 ? ConsoleColor.Cyan
-                                         : ConsoleColor.White;
-                Console.WriteLine(k.VictimName);
-                Console.ResetColor();
-            }
-        }
-
-        // Debug log
-        if (debugLog.Count > 0)
-        {
-            Console.WriteLine();
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine("  DEBUG LOG (first 16 bytes of each killing FSHitInfo)");
-            Console.ResetColor();
-            foreach (var line in debugLog)
-            {
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine("  " + line);
-                Console.ResetColor();
             }
         }
     }
