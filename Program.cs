@@ -259,7 +259,7 @@ class BCATracker
 
     static void Main()
     {
-        Console.Title = "BCA Tracker — Alpha V0.11";
+        Console.Title = "BCA Tracker — Alpha V0.12";
         Console.CursorVisible = false;
 
         while (true)
