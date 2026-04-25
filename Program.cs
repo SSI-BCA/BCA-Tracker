@@ -186,6 +186,8 @@ class BCATracker
 
     // Previous-tick snapshot of each player's K/D so we can detect changes
     static Dictionary<long, (int kills, int deaths)> prevPlayerStats = new Dictionary<long, (int, int)>();
+    static System.Diagnostics.Stopwatch matchTimer = new System.Diagnostics.Stopwatch();
+    static byte lastGameState = 255;
     static List<KillFeedEntry> killFeed = new List<KillFeedEntry>();
     const int KILL_FEED_MAX = 10;
     static readonly string[] GAME_STATES = {
@@ -335,7 +337,6 @@ class BCATracker
                 bool inMatch = false;
                 bool isPostMatch = false;
                 bool isLobby = false;
-                double gameTime = 0;
                 LobbyData lobbyData = null;
 
                 if (gameState != 0)
@@ -347,7 +348,6 @@ class BCATracker
                     {
                         gameStateEnum = rawState;
                         gameModeEnum = rawMode;
-                        gameTime = ReadDouble(handle, gameState + OFF_ARENAGS_GAMETIME);
 
                         if (rawState == 9) inMatch = true;                        // Playing
                         else if (rawState >= 4 && rawState <= 8) inMatch = true;  // Loading → Countdown also show live data
@@ -363,6 +363,15 @@ class BCATracker
 
                 // Kill feed only during active play
                 if (inMatch && gameStateEnum == 9) DetectKills(handle, players, myStatePtr);
+
+                // Track match timer — start when Playing begins, stop at end
+                if (gameStateEnum != lastGameState)
+                {
+                    if (gameStateEnum == 9) matchTimer.Restart();      // Playing started
+                    else if (gameStateEnum >= 10) matchTimer.Stop();   // Match ended
+                    lastGameState = gameStateEnum;
+                }
+                double gameTime = matchTimer.Elapsed.TotalSeconds;
 
                 // Read match lives
                 int myLives = ReadChain4(handle, moduleBase, BASE_MY_LIVES, OFF_MY_LIVES);
@@ -832,14 +841,14 @@ class BCATracker
         {
             string stateName = gameStateEnum < GAME_STATES.Length ? GAME_STATES[gameStateEnum] : "Transition";
             string modeName = gameModeEnum < GAMEMODES.Length ? GAMEMODES[gameModeEnum] : "?";
-            string timer = gameTime > 0 ? $"{(int)gameTime / 60}:{(int)gameTime % 60:D2}" : "--:--";
+            string timer = gameTime > 0 ? $"{(int)gameTime / 60}:{(int)gameTime % 60:D2}" : "0:00";
 
             Console.ForegroundColor = ConsoleColor.White;
             Console.Write($"  {modeName}");
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.Write($"  [{stateName}]");
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine($"  ⏱ {timer}");
+            Console.WriteLine($"  Time: {timer}");
             Console.ResetColor();
 
             // Lives
