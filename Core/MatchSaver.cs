@@ -15,16 +15,14 @@ namespace BCATracker
         };
 
         readonly string _saveDir;
-        readonly string _logPath;
 
-        bool          _wasPostMatch      = false;
+        bool _wasPostMatch = false;
         MatchSnapshot _lastPostMatchSnap = null;
 
-        // Map/mode are carried from the lobby phase because:
-        //   • ArenaTeamGS.CurrentMap (0x3E8) is server-side only — always 0 on the client.
-        //   • CustomGameGS.ArenaRowName (0x328) is reliably replicated in lobby.
-        // We keep the last known values and only overwrite them when we get a valid name.
-        string _lobbyMapName  = null;
+        // Map/mode cached from lobby phase.
+        // AGS_CurrentMap (0x3E8) is server-only and always 0 on the client.
+        // CustomGameGS_C.ArenaRowName (0x328) is reliably replicated in lobby.
+        string _lobbyMapName = null;
         string _lobbyModeName = null;
 
         public MatchSaver()
@@ -32,64 +30,72 @@ namespace BCATracker
             string hub = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "BCA-Hub");
-
             _saveDir = Path.Combine(hub, "matches");
-            _logPath = Path.Combine(hub, "saver.log");
-
             Directory.CreateDirectory(_saveDir);
-            Log($"MatchSaver started. saveDir={_saveDir}");
+            DiagLog.Write($"[Saver] Started — saveDir={_saveDir}");
         }
 
         public void Tick(MatchSnapshot snap)
         {
             if (snap == null)
             {
-                Log("Tick(null): process exited");
+                DiagLog.Write("[Saver] Tick(null) — process gone");
                 if (_lastPostMatchSnap != null)
                 {
-                    Log("  → saving pending post-match snap");
+                    DiagLog.Write("[Saver] Saving pending post-match snap on process exit");
                     TrySave(_lastPostMatchSnap);
                     _lastPostMatchSnap = null;
-                    _wasPostMatch      = false;
+                    _wasPostMatch = false;
                 }
                 return;
             }
 
-            // Cache map/mode from lobby. Only update when the name is valid so a
-            // transient "Unknown" reading doesn't clobber a good cached value.
+            // Cache map/mode from lobby — only overwrite with a valid name
             if (snap.IsLobby && snap.Lobby != null)
             {
-                if (IsValidName(snap.Lobby.MapName) && _lobbyMapName != snap.Lobby.MapName)
+                if (IsValidName(snap.Lobby.MapName))
                 {
-                    _lobbyMapName = snap.Lobby.MapName;
-                    Log($"Lobby map cached: \"{_lobbyMapName}\"");
+                    if (_lobbyMapName != snap.Lobby.MapName)
+                    {
+                        _lobbyMapName = snap.Lobby.MapName;
+                        DiagLog.LobbyCached(_lobbyMapName, _lobbyModeName ?? "<pending>");
+                    }
                 }
+                else
+                {
+                    DiagLog.LobbyMapInvalid(snap.Lobby.MapName);
+                }
+
                 if (IsValidName(snap.Lobby.ModeName) && _lobbyModeName != snap.Lobby.ModeName)
                 {
                     _lobbyModeName = snap.Lobby.ModeName;
-                    Log($"Lobby mode cached: \"{_lobbyModeName}\"");
+                    DiagLog.LobbyCached(_lobbyMapName ?? "<pending>", _lobbyModeName);
                 }
             }
 
             if (snap.IsPostMatch)
             {
+                if (!_wasPostMatch)
+                    DiagLog.Write($"[Saver] Entered post-match — holding snap for save " +
+                                  $"(map={_lobbyMapName ?? "null"} mode={_lobbyModeName ?? "null"} " +
+                                  $"players={snap.Players?.Count ?? 0})");
                 _lastPostMatchSnap = snap;
-                _wasPostMatch      = true;
+                _wasPostMatch = true;
                 return;
             }
 
             if (_wasPostMatch && _lastPostMatchSnap != null)
             {
-                Log($"Tick: left post-match (state={snap.StateName}), saving…");
+                DiagLog.Write($"[Saver] Left post-match (now state={snap.StateName}) — saving");
                 TrySave(_lastPostMatchSnap);
                 _lastPostMatchSnap = null;
-                _wasPostMatch      = false;
+                _wasPostMatch = false;
                 return;
             }
 
-            if (snap.IsLobby || snap.IsWaiting)
+            if (snap.IsLobby || snap.IsWaiting || snap.IsMainMenu)
             {
-                _wasPostMatch      = false;
+                _wasPostMatch = false;
                 _lastPostMatchSnap = null;
             }
         }
@@ -104,50 +110,56 @@ namespace BCATracker
                     var rec = JsonSerializer.Deserialize<MatchRecord>(File.ReadAllText(file), JsonOpts);
                     if (rec != null) records.Add(rec);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    DiagLog.Write($"[Saver] LoadAll failed for {file}: {ex.Message}");
+                }
             }
             records.Sort((a, b) => b.PlayedAt.CompareTo(a.PlayedAt));
             return records;
         }
 
-        // ── Private ─────────────────────────────────────────────────────────────
+        // ── Private ──────────────────────────────────────────────────────────
 
         static bool IsValidName(string name)
-            => !string.IsNullOrEmpty(name) && !name.StartsWith("Unknown", StringComparison.Ordinal);
+            => !string.IsNullOrEmpty(name)
+            && !name.StartsWith("Unknown", StringComparison.Ordinal);
 
         void TrySave(MatchSnapshot snap)
         {
             try
             {
-                // Prefer lobby-cached name; snap.CurrentMap is almost always "Unknown"
-                // on the client (server-only field). Only use it as a last resort.
-                string mapName = IsValidName(_lobbyMapName)  ? _lobbyMapName
-                               : IsValidName(snap.CurrentMap) ? snap.CurrentMap
-                               : "Unknown";
+                string mapName = IsValidName(_lobbyMapName) ? _lobbyMapName
+                                : IsValidName(snap.CurrentMap) ? snap.CurrentMap
+                                : "Unknown";
+                string modeName = IsValidName(_lobbyModeName) ? _lobbyModeName
+                                : snap.ModeName;
 
-                string modeName = IsValidName(_lobbyModeName) ? _lobbyModeName : snap.ModeName;
+                DiagLog.SaveTrigger(mapName, modeName, snap.Players?.Count ?? 0);
 
-                var    record = BuildRecord(snap, mapName, modeName);
-                var    date   = snap.UpdatedAt;
-                string dir    = Path.Combine(_saveDir, date.ToString("yyyy-MM"), date.ToString("yyyy-MM-dd"));
+                var record = BuildRecord(snap, mapName, modeName);
+                var date = snap.UpdatedAt;
+                string dir = Path.Combine(_saveDir,
+                                    date.ToString("yyyy-MM"),
+                                    date.ToString("yyyy-MM-dd"));
                 Directory.CreateDirectory(dir);
 
-                string mapSlug  = Truncate(Sanitize(mapName),  30);
-                string modeSlug = Truncate(Sanitize(modeName), 20);
-                string file     = $"match_{date:HH-mm-ss}_{mapSlug}_{modeSlug}.json";
-                string path     = Path.Combine(dir, file);
+                string file = $"match_{date:HH-mm-ss}_{Truncate(Sanitize(mapName), 30)}" +
+                              $"_{Truncate(Sanitize(modeName), 20)}.json";
+                string path = Path.Combine(dir, file);
 
                 File.WriteAllText(path, JsonSerializer.Serialize(record, JsonOpts));
-                Log($"Saved → {path}");
+
+                DiagLog.SaveOk(path);
                 Console.WriteLine($"  [Saved] {path}");
 
-                // Reset cache so back-to-back matches don't inherit the old map.
-                _lobbyMapName  = null;
+                // Reset cache so the next match doesn't inherit this map
+                _lobbyMapName = null;
                 _lobbyModeName = null;
             }
             catch (Exception ex)
             {
-                Log($"TrySave FAILED: {ex.GetType().Name}: {ex.Message}");
+                DiagLog.SaveFailed(ex);
                 Console.WriteLine($"  [Save failed] {ex.Message}");
             }
         }
@@ -162,77 +174,71 @@ namespace BCATracker
         static string Truncate(string s, int max)
             => s.Length <= max ? s : s[..max];
 
-        void Log(string msg)
-        {
-            try { File.AppendAllText(_logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}{Environment.NewLine}"); }
-            catch { }
-        }
-
         MatchRecord BuildRecord(MatchSnapshot snap, string mapName, string modeName)
         {
             var record = new MatchRecord
             {
-                PlayedAt     = snap.UpdatedAt.ToUniversalTime(),
-                Map          = mapName,
-                GameMode     = modeName,
+                PlayedAt = snap.UpdatedAt.ToUniversalTime(),
+                Map = mapName,
+                GameMode = modeName,
                 DurationSecs = snap.MatchTime,
             };
 
-            var winners = snap.Players.FindAll(p => p.IsWinner && !p.IsBot);
-            record.WinningTeam = winners.Count > 0 ? $"Team{winners[0].Team}" : "Unknown";
+            var winners = snap.Players?.FindAll(p => p.IsWinner && !p.IsBot);
+            record.WinningTeam = winners?.Count > 0 ? $"Team{winners[0].Team}" : "Unknown";
 
-            foreach (var p in snap.Players)
+            foreach (var p in snap.Players ?? new List<PlayerInfo>())
             {
                 record.Players.Add(new PlayerRecord
                 {
-                    Name          = p.Name,
-                    Team          = p.Team,
-                    IsBot         = p.IsBot,
-                    BotLevel      = p.BotLevel,
+                    Name = p.Name,
+                    Team = p.Team,
+                    IsBot = p.IsBot,
+                    BotLevel = p.BotLevel,
                     IsLocalPlayer = p.IsLocal,
-                    IsWinner      = p.IsWinner,
-                    Weapon        = p.WeaponName,
-                    Ability       = p.AbilityName,
-                    Module        = p.ModuleName,
+                    IsWinner = p.IsWinner,
+                    Weapon = p.WeaponName,
+                    Ability = p.AbilityName,
+                    Module = p.ModuleName,
 
-                    Kills           = p.Kills,
-                    Deaths          = p.Deaths,
-                    Assists         = p.Assists,
-                    KDRatio         = p.KDRatio,
-                    Accuracy        = p.Accuracy,
+                    Kills = p.Kills,
+                    Deaths = p.Deaths,
+                    Assists = p.Assists,
+                    KDRatio = p.KDRatio,
+                    Accuracy = p.Accuracy,
                     AbilityAccuracy = p.AbilityAccuracy,
-                    Damage          = Math.Round(p.Damage, 1),
-                    Heal            = Math.Round(p.Heal, 1),
-                    NbHitsCaused    = p.NbHitsCaused,
-                    NbHitsReceived  = p.NbHitsReceived,
-                    Score           = p.Score,
+                    Damage = Math.Round(p.Damage, 1),
+                    Heal = Math.Round(p.Heal, 1),
+                    NbHitsCaused = p.NbHitsCaused,
+                    NbHitsReceived = p.NbHitsReceived,
+                    Score = p.Score,
 
-                    ReceivedShieldDmg         = Math.Round(p.ReceivedShieldDmg, 1),
+                    ReceivedShieldDmg = Math.Round(p.ReceivedShieldDmg, 1),
                     ReceivedEffectiveShieldDmg = Math.Round(p.ReceivedEffectiveShieldDmg, 1),
-                    WeaponShieldDmgDealt       = Math.Round(p.WeaponShieldDmgDealt, 1),
-                    AbilityShieldDmgDealt      = Math.Round(p.AbilityShieldDmgDealt, 1),
+                    WeaponShieldDmgDealt = Math.Round(p.WeaponShieldDmgDealt, 1),
+                    AbilityShieldDmgDealt = Math.Round(p.AbilityShieldDmgDealt, 1),
 
-                    ImpulseReceived    = Math.Round(p.ImpulseReceived, 1),
+                    ImpulseReceived = Math.Round(p.ImpulseReceived, 1),
                     WeaponImpulseDealt = Math.Round(p.WeaponImpulseDealt, 1),
                     AbilityImpulseDealt = Math.Round(p.AbilityImpulseDealt, 1),
 
-                    Dashes         = p.Dashes,
-                    Jumps          = p.Jumps,
-                    AbilitiesUsed  = p.AbilitiesUsed,
+                    Dashes = p.Dashes,
+                    Jumps = p.Jumps,
+                    AbilitiesUsed = p.AbilitiesUsed,
                     NbAbilitiesHit = p.NbAbilitiesHit,
-                    ShieldPickups  = p.ShieldPickups,
-                    Empowerments   = p.Empowerments,
-                    TimeAliveSecs  = Math.Round(p.TimeAlive, 1),
+                    ShieldPickups = p.ShieldPickups,
+                    Empowerments = p.Empowerments,
+                    TimeAliveSecs = Math.Round(p.TimeAlive, 1),
 
                     GravityDurationSecs = Math.Round(p.GravityDuration, 1),
-                    GravityOnGround     = Math.Round(p.GravityOnGround, 1),
-                    GravityInAir        = Math.Round(p.GravityInAir, 1),
-                    GravityUseCount     = p.GravityUseCount,
+                    GravityOnGround = Math.Round(p.GravityOnGround, 1),
+                    GravityInAir = Math.Round(p.GravityInAir, 1),
+                    GravityUseCount = p.GravityUseCount,
 
                     NbTotalPings = p.NbTotalPings,
                     NbEnemyPings = p.NbEnemyPings,
 
-                    FfaNbBackUp     = p.FfaNbBackUp,
+                    FfaNbBackUp = p.FfaNbBackUp,
                     FfaDeathRanking = p.FfaDeathRanking,
                 });
             }
@@ -242,12 +248,12 @@ namespace BCATracker
                 int t = (int)k.ElapsedSecs;
                 record.KillFeed.Add(new KillRecord
                 {
-                    KillerName    = k.KillerName,
-                    VictimName    = k.VictimName,
-                    Cause         = k.Cause,
+                    KillerName = k.KillerName,
+                    VictimName = k.VictimName,
+                    Cause = k.Cause,
                     IsAbilityKill = k.IsAbilityKill,
-                    KillerTeam    = k.KillerTeam,
-                    TimeInMatch   = $"{t / 60}:{t % 60:D2}",
+                    KillerTeam = k.KillerTeam,
+                    TimeInMatch = $"{t / 60}:{t % 60:D2}",
                 });
             }
 

@@ -44,8 +44,8 @@ namespace BCATracker
         {
             C(ConsoleColor.White);   L("  MAIN MENU"); R();
             C(ConsoleColor.DarkGray); L("  " + Dashes(40)); R();
-            Console.Write("  Screen state: ");
-            C(ConsoleColor.Yellow); L(snap.MainMenuState.ToString()); R();
+            Console.Write("  Screen: ");
+            C(ConsoleColor.Yellow); L(BCAEnums.MainMenuStateName(snap.MainMenuState)); R();
             Console.WriteLine();
             C(ConsoleColor.DarkGray); L($"  {Timestamp(snap)}"); R();
         }

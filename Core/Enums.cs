@@ -41,28 +41,48 @@ namespace BCATracker
         public static string GameModeName(byte id)
             => id < GameModes.Length ? GameModes[id] : "?";
 
-        // ── GameState ─────────────────────────────────────────────────────────────
+        // ── GameState (in-match) ─────────────────────────────────────────────
+        // Read from ArenaTeamGS_C.CurrentGameState (uint8 EGameState at +0x369).
+        // Names corrected from observation in-game.
         static readonly string[] GameStates =
         {
-            "MainMenu",         // 0
-            "Loading",          // 1
-            "Loading2",         // 2
-            "Loading3",         // 3
-            "LoadoutSelection", // 4
-            "PreMatchStart",    // 5
-            "MatchStart",       // 6
-            "MapLoaded",        // 7
-            "Countdown",        // 8
-            "Playing",          // 9
-            "EndGame1",         // 10
-            "EndGame2",         // 11
-            "Podium",           // 12
-            "Leaderboard",      // 13
-            "State14",          // 14
-            "State15"           // 15
+            "MainMenu",          // 0
+            "Loading",           // 1
+            "Loading2",          // 2
+            "LoadoutSelect",     // 3  — players picking weapon/ability/module
+            "LoadoutReady",      // 4  — everyone has confirmed their loadout
+            "PreMatchStart",     // 5
+            "MatchStart",        // 6
+            "MapLoaded",         // 7
+            "Countdown",         // 8
+            "Playing",           // 9
+            "EndGame1",          // 10
+            "EndGame2",          // 11
+            "Podium",            // 12
+            "Leaderboard",       // 13
+            "State14",           // 14
+            "State15"            // 15
         };
         public static string GameStateName(byte id)
             => id < GameStates.Length ? GameStates[id] : "Transition";
+
+        // ── MainMenuHUD screen state ─────────────────────────────────────────
+        // Read from MainMenuHUD_C.MainMenuState (uint8 at +0x428).
+        // Names from observation in-game; gaps are states not yet identified.
+        static readonly Dictionary<byte, string> MainMenuStates = new()
+        {
+            { 0,  "Main Menu" },
+            { 1,  "Gamemode Selection" },
+            { 3,  "Shop" },
+            { 4,  "Item Detail" },
+            { 6,  "Customization" },
+            { 9,  "Options" },
+            { 11, "Social" },
+            { 12, "Customization Transition" },
+            { 13, "Credits" },
+        };
+        public static string MainMenuStateName(byte id)
+            => MainMenuStates.TryGetValue(id, out string n) ? n : $"State {id}";
 
         // ── Map row-name → display name ──────────────────────────────────────────
         //
@@ -98,11 +118,19 @@ namespace BCATracker
         }
 
         // ── Mode row-name → display name ─────────────────────────────────────────
+        //
+        // Keys are the row names found in CustomGameGS_C.GameModeRowName at
+        // runtime. To extend: pick a new mode in-game. The diag log will print
+        //   [FName] Mode idx=... raw="<actual_row_name>" — no display name match
+        // Add the row name to this dictionary. The legacy guesses
+        // ("Backup3v3", "GoldenCore3v3", "BackupFFA") were wrong but are kept
+        // in case other game versions still use them.
         static readonly Dictionary<string, string> _modeRowToDisplay = new()
         {
-            { "Backup3v3",     "Backup 3v3" },
-            { "GoldenCore3v3", "Q-Ball"     },
-            { "BackupFFA",     "FFA"        },
+            { "Backup_Casual", "Backup 3v3" },         // observed in custom-game lobby
+            { "Backup3v3",     "Backup 3v3" },         // legacy guess, kept as fallback
+            { "GoldenCore3v3", "Q-Ball"     },         // legacy guess, kept as fallback
+            { "BackupFFA",     "FFA"        },         // legacy guess, kept as fallback
         };
 
         public static string ModeRowNameToDisplayName(string rowName)
