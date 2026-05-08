@@ -1,0 +1,48 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="clr-namespace:BCATracker.UI.Controls"
+        xmlns:views="clr-namespace:BCATracker.UI.Views"
+        x:Class="BCATracker.UI.MainWindow"
+        Title="BCA-Tracker"
+        Width="1320" Height="860"
+        MinWidth="980" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Bg.Base}">
+
+    <Border Background="{DynamicResource Bg.Base}">
+        <Grid RowDefinitions="Auto,*,Auto">
+
+            <Border Grid.Row="0"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    BorderThickness="0,0,0,1">
+                <ctl:TopNav x:Name="Nav"/>
+            </Border>
+
+            <ContentControl x:Name="ContentHost"
+                            Grid.Row="1"
+                            Background="Transparent"/>
+
+            <!-- Status bar -->
+            <Border Grid.Row="2"
+                    Background="{DynamicResource Bg.Nav}"
+                    BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource Border.Subtle}"
+                    Padding="20,7">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8"
+                                 Fill="{DynamicResource Good}"
+                                 VerticalAlignment="Center"/>
+                        <TextBlock x:Name="StatusText"
+                                   Margin="8,0,0,0"
+                                   Classes="caption"/>
+                    </StackPanel>
+                    <TextBlock x:Name="VersionText"
+                               Grid.Column="1"
+                               Classes="caption"
+                               Foreground="{DynamicResource Fg.Disabled}"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

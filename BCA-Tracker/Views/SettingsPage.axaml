@@ -1,0 +1,154 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Views.SettingsPage">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,24,32,32" MaxWidth="800" HorizontalAlignment="Left">
+            <TextBlock Classes="page-title" Text="Settings"/>
+            <TextBlock Classes="muted" Margin="0,4,0,24"
+                       Text="Paths and launcher preferences. Saved to %AppData%\BCA-Tracker\settings.json."/>
+
+            <!-- Launcher -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Launcher" Margin="0,0,0,12"/>
+                    <CheckBox x:Name="RememberCheck"
+                              Content="Skip the launcher and always open my preferred UI"
+                              IsCheckedChanged="Remember_Changed"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                        <TextBlock Text="Preferred UI:" VerticalAlignment="Center" Margin="0,0,12,0"
+                                   Foreground="{DynamicResource Fg.Secondary}"/>
+                        <ComboBox x:Name="PreferredUICombo" Width="180"
+                                  SelectionChanged="PreferredUI_Changed">
+                            <ComboBoxItem Content="New UI" Tag="Modern"/>
+                            <ComboBoxItem Content="Legacy console" Tag="Legacy"/>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Paths -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Paths" Margin="0,0,0,12"/>
+
+                    <TextBlock Classes="label" Text="MATCHES FOLDER" Margin="0,0,0,4"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                        <TextBox x:Name="MatchesFolderBox"
+                                 Grid.Column="0"
+                                 LostFocus="MatchesFolder_LostFocus"/>
+                        <Button Grid.Column="1" Content="Reset to default"
+                                Margin="8,0,0,0"
+                                Click="ResetMatchesFolder_Click"/>
+                    </Grid>
+                    <TextBlock Classes="caption"
+                               Text="Folder scanned for match_*.json files. Leave blank to use the default %AppData%\BCA-Tracker\matches\."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Profile -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Profile" Margin="0,0,0,12"/>
+                    <Grid ColumnDefinitions="64,*,Auto" RowDefinitions="64">
+                        <!-- Preview -->
+                        <Panel Grid.Column="0" Width="64" Height="64">
+                            <Border x:Name="AvatarFallback"
+                                    CornerRadius="32"
+                                    Background="{DynamicResource Bg.SurfaceRaised}">
+                                <TextBlock Text="?"
+                                           Foreground="{DynamicResource Fg.Muted}"
+                                           FontFamily="{DynamicResource Font.Display}"
+                                           FontSize="28"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"/>
+                            </Border>
+                            <Border x:Name="AvatarPreviewHost"
+                                    CornerRadius="32"
+                                    ClipToBounds="True"
+                                    IsVisible="False">
+                                <Image x:Name="AvatarPreview" Stretch="UniformToFill"/>
+                            </Border>
+                        </Panel>
+
+                        <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Classes="label" Text="PROFILE PICTURE"/>
+                            <TextBlock x:Name="ProfilePictureStatusText"
+                                       Classes="muted"
+                                       Margin="0,4,0,0"
+                                       Text="No picture set — using initial avatar"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="Choose…" Click="ChoosePicture_Click"/>
+                            <Button Content="Clear" Margin="8,0,0,0" Click="ClearPicture_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Discord RPC -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Discord Rich Presence" Margin="0,0,0,12"/>
+                    <CheckBox x:Name="DiscordEnabledCheck"
+                              Content="Show what I'm doing on my Discord profile"
+                              IsCheckedChanged="DiscordEnabled_Changed"/>
+                    <TextBlock Classes="label" Text="DISCORD APP CLIENT ID" Margin="0,12,0,4"/>
+                    <TextBox x:Name="DiscordClientIdBox"
+                             Watermark="(create one at discord.com/developers/applications)"
+                             LostFocus="DiscordClientId_LostFocus"/>
+                    <TextBlock Classes="caption" Margin="0,4,0,0"
+                               TextWrapping="Wrap"
+                               Text="You need your own Discord application to use this. Go to https://discord.com/developers/applications, create an app, copy its Client ID. Changes take effect on next launch."/>
+                </StackPanel>
+            </Border>
+
+            <!-- About -->
+            <Border Classes="card">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="About" Margin="0,0,0,12"/>
+                    <Grid ColumnDefinitions="140,*"
+                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                          Margin="0,0,0,4">
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="VERSION" Margin="0,0,0,8"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="VersionText" Margin="0,0,0,8"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="RUNTIME" Margin="0,0,0,8"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="RuntimeText" Margin="0,0,0,8"
+                                   FontFamily="Consolas, monospace"
+                                   Foreground="{DynamicResource Fg.Secondary}"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="GAME" Margin="0,0,0,8"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="GameStatusText" Margin="0,0,0,8"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="READER" Margin="0,0,0,8"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ReaderStatusText" Margin="0,0,0,8"
+                                   FontFamily="Consolas, monospace"
+                                   Foreground="{DynamicResource Fg.Secondary}"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="label" Text="MATCH" Margin="0,0,0,8"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="MatchStatusText" Margin="0,0,0,8"
+                                   Foreground="{DynamicResource Fg.Secondary}"/>
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="label" Text="SAVES" Margin="0,0,0,8"/>
+                        <TextBlock Grid.Row="5" Grid.Column="1" x:Name="SavesText" Margin="0,0,0,8"
+                                   Foreground="{DynamicResource Fg.Secondary}"/>
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="label" Text="LOGS"/>
+                        <StackPanel Grid.Row="6" Grid.Column="1">
+                            <TextBlock Text="%AppData%\BCA-Tracker\diag.log" FontFamily="Consolas, monospace"
+                                       Foreground="{DynamicResource Fg.Secondary}"/>
+                            <TextBlock Text="%AppData%\BCA-Tracker\fname_resolver.log" FontFamily="Consolas, monospace"
+                                       Foreground="{DynamicResource Fg.Secondary}"/>
+                            <TextBlock Text="%AppData%\BCA-Tracker\crash.log" FontFamily="Consolas, monospace"
+                                       Foreground="{DynamicResource Fg.Secondary}"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

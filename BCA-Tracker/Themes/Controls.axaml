@@ -1,0 +1,148 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        ╔════════════════════════════════════════════════════════════════════╗
+        ║ Controls — restyled stock controls.                                ║
+        ║                                                                    ║
+        ║ Default styles apply to every control of that type. Variants are   ║
+        ║ opted into via Classes (e.g. <Button Classes="primary"/>).         ║
+        ║                                                                    ║
+        ║ Pseudo-class reference for Avalonia:                               ║
+        ║   :pointerover  — hover                                            ║
+        ║   :pressed      — mouse down                                       ║
+        ║   :checked      — for ToggleButton/CheckBox/RadioButton            ║
+        ║   :focus        — keyboard focus                                   ║
+        ║   :disabled     — IsEnabled = False                                ║
+        ╚════════════════════════════════════════════════════════════════════╝
+    -->
+
+    <!-- ── Button ──────────────────────────────────────────────────────── -->
+    <Style Selector="Button">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Body}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+        <Setter Property="Background" Value="{DynamicResource Bg.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="2"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background"  Duration="0:0:0.12"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.12"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Bg.SurfaceHover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+    </Style>
+
+    <Style Selector="Button:pressed">
+        <Setter Property="Background" Value="{DynamicResource Bg.SurfaceRaised}"/>
+    </Style>
+
+    <Style Selector="Button:disabled">
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Disabled}"/>
+        <Setter Property="Opacity" Value="0.5"/>
+        <Setter Property="Cursor" Value="Arrow"/>
+    </Style>
+
+    <!-- Hover-only accent line on the inside of the button.
+         We use the Button's template ContentPresenter — that's the part
+         that renders the actual content frame. Avalonia exposes it as
+         /template/ContentPresenter#PART_ContentPresenter. -->
+
+    <!-- Primary variant: solid accent background. Use sparingly. -->
+    <Style Selector="Button.primary">
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Accent.Hover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Hover}"/>
+    </Style>
+    <Style Selector="Button.primary:pressed">
+        <Setter Property="Background" Value="{DynamicResource Accent.Pressed}"/>
+    </Style>
+
+    <!-- Ghost variant: no border, no background, only text. For nav-like
+         actions where we don't want the button to look pressy. -->
+    <Style Selector="Button.ghost">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Secondary}"/>
+    </Style>
+    <Style Selector="Button.ghost:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Bg.SurfaceHover}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+    </Style>
+
+    <!-- ── TextBox ─────────────────────────────────────────────────────── -->
+    <Style Selector="TextBox">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Body}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+        <Setter Property="CaretBrush" Value="{DynamicResource Accent}"/>
+        <Setter Property="SelectionBrush" Value="{DynamicResource Accent}"/>
+        <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="2"/>
+        <Setter Property="Padding" Value="10,7"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+
+    <!-- ── CheckBox ────────────────────────────────────────────────────── -->
+    <Style Selector="CheckBox">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Body}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- ── ComboBox ────────────────────────────────────────────────────── -->
+    <Style Selector="ComboBox">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Body}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+        <Setter Property="Background" Value="{DynamicResource Bg.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="2"/>
+        <Setter Property="Padding" Value="10,7"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="ComboBox:pointerover /template/ Border#background">
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+    </Style>
+
+    <Style Selector="ComboBoxItem">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Body}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+        <Setter Property="Padding" Value="10,7"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Bg.SurfaceHover}"/>
+    </Style>
+    <Style Selector="ComboBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Bg.SurfaceHover}"/>
+    </Style>
+
+</Styles>

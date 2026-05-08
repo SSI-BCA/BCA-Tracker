@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Controls.TopNav"
+             Height="48"
+             Background="{DynamicResource Bg.Nav}">
+
+    <Grid ColumnDefinitions="Auto,*">
+
+        <!-- Brand mark -->
+        <StackPanel Grid.Column="0" Margin="20,0,32,0" Orientation="Horizontal" VerticalAlignment="Center">
+            <Border Width="6" Height="20"
+                    Background="{DynamicResource Accent}"
+                    CornerRadius="1"
+                    VerticalAlignment="Center"/>
+            <TextBlock Margin="10,0,0,0"
+                       VerticalAlignment="Center"
+                       FontFamily="{DynamicResource Font.Display}"
+                       FontSize="15"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource Fg.Primary}"
+                       Text="BCA-TRACKER"/>
+        </StackPanel>
+
+        <!-- Tab buttons. Populated in code-behind so we don't need a custom
+             ListBox template. -->
+        <StackPanel x:Name="TabsHost"
+                    Grid.Column="1"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Stretch"/>
+    </Grid>
+</UserControl>

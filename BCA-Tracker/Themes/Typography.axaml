@@ -1,0 +1,87 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        ╔════════════════════════════════════════════════════════════════════╗
+        ║ Typography — text styles applied via the `Classes` attribute.      ║
+        ║                                                                    ║
+        ║ Usage:                                                             ║
+        ║   <TextBlock Classes="page-title" Text="Match History"/>           ║
+        ║   <TextBlock Classes="stat-value" Text="1.47"/>                    ║
+        ║   <TextBlock Classes="label" Text="K/D RATIO"/>                    ║
+        ║                                                                    ║
+        ║ Avalonia's class-based styling is CSS-like: multiple classes can   ║
+        ║ be combined ("stat-value good"), and pseudo-classes (:pointerover) ║
+        ║ work the same way.                                                 ║
+        ╚════════════════════════════════════════════════════════════════════╝
+    -->
+
+    <!-- Default body text — applied to every plain TextBlock. -->
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Body}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+    </Style>
+
+    <Style Selector="TextBlock.muted">
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Secondary}"/>
+    </Style>
+
+    <Style Selector="TextBlock.caption">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Muted}"/>
+    </Style>
+
+    <!-- "Label" — small, all-caps, wide-tracked. The signature gamer-tracker
+         look used under stat numbers and on section headers. -->
+    <Style Selector="TextBlock.label">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Display}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Muted}"/>
+        <Setter Property="LetterSpacing" Value="1.2"/>
+    </Style>
+
+    <Style Selector="TextBlock.page-title">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Display}"/>
+        <Setter Property="FontSize" Value="32"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+    </Style>
+
+    <Style Selector="TextBlock.section-title">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Display}"/>
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+    </Style>
+
+    <!-- Big stat number (1.47, 63%, 187). -->
+    <Style Selector="TextBlock.stat-value">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Display}"/>
+        <Setter Property="FontSize" Value="36"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+        <Setter Property="LineHeight" Value="40"/>
+    </Style>
+
+    <!-- Mid-sized stat (in scoreboards: kills, deaths, assists). -->
+    <Style Selector="TextBlock.stat-mid">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Display}"/>
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+    </Style>
+
+    <!-- Modifier classes that combine with any of the above. -->
+    <Style Selector="TextBlock.good">
+        <Setter Property="Foreground" Value="{DynamicResource Good}"/>
+    </Style>
+    <Style Selector="TextBlock.danger">
+        <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+    </Style>
+    <Style Selector="TextBlock.accent">
+        <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+
+</Styles>

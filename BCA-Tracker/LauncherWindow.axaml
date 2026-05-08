@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="clr-namespace:BCATracker.UI.Controls"
+        x:Class="BCATracker.UI.LauncherWindow"
+        Title="BCA-Tracker"
+        Width="520" Height="400"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Bg.Base}">
+
+    <Border Background="{DynamicResource Bg.Base}">
+        <Grid RowDefinitions="*,Auto">
+
+            <StackPanel Grid.Row="0" Margin="36,28,36,0" VerticalAlignment="Center">
+                <TextBlock Classes="page-title"
+                           FontSize="24"
+                           Text="Choose your interface"/>
+                <TextBlock Classes="muted"
+                           Margin="0,6,0,24"
+                           TextWrapping="Wrap"
+                           Text="The new tracker offers a graphical match history and stats. The legacy console keeps the alpha-era interface for fallback."/>
+
+                <Button Classes="card-button"
+                        Margin="0,0,0,12"
+                        Padding="20,16"
+                        HorizontalAlignment="Stretch"
+                        Click="ModernCard_Click">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Classes="section-title"
+                                   FontSize="15"
+                                   Text="New UI"/>
+                        <TextBlock Classes="muted"
+                                   Margin="0,2,0,0"
+                                   Text="Match history, lifetime stats, charts"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="card-button"
+                        Padding="20,16"
+                        HorizontalAlignment="Stretch"
+                        Click="LegacyCard_Click">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Classes="section-title"
+                                   FontSize="15"
+                                   Text="Legacy console"/>
+                        <TextBlock Classes="muted"
+                                   Margin="0,2,0,0"
+                                   Text="Original alpha-era console interface"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <DockPanel Grid.Row="1" Margin="36,16,36,20">
+                <CheckBox x:Name="DontAskAgainCheck"
+                          Content="Don't ask again — always use my last choice"
+                          DockPanel.Dock="Left"/>
+            </DockPanel>
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Controls.TitleBar"
+             Height="36"
+             Background="{DynamicResource Bg.Base}">
+
+    <UserControl.Styles>
+        <!-- Local title-bar button style. Min/max get a subtle hover; close
+             goes red. Defined locally because they're tightly coupled to
+             the title-bar layout (sizing, alignment) — not reusable. -->
+        <Style Selector="Button.titlebar-button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg.Secondary}"/>
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Cursor" Value="Arrow"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="Button.titlebar-button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Bg.SurfaceHover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+        </Style>
+        <Style Selector="Button.titlebar-button.close:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Danger}"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="*,Auto">
+
+        <!-- Drag region. PointerPressed begins window move. -->
+        <Border Grid.Column="0"
+                Background="Transparent"
+                PointerPressed="DragRegion_PointerPressed">
+            <TextBlock x:Name="TitleText"
+                       Margin="16,0,0,0"
+                       VerticalAlignment="Center"
+                       FontFamily="{DynamicResource Font.Display}"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource Fg.Secondary}"
+                       LetterSpacing="1.2"/>
+        </Border>
+
+        <!-- Window controls -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <Button Classes="titlebar-button" Click="Min_Click" ToolTip.Tip="Minimise">
+                <Path Data="M 0,0 L 10,0"
+                      Stroke="{Binding $parent[Button].Foreground}"
+                      StrokeThickness="1.2"/>
+            </Button>
+            <Button x:Name="MaxButton"
+                    Classes="titlebar-button"
+                    Click="Max_Click"
+                    ToolTip.Tip="Maximise">
+                <Path x:Name="MaxIcon"
+                      Data="M 0,0 H 10 V 10 H 0 Z"
+                      Stroke="{Binding $parent[Button].Foreground}"
+                      StrokeThickness="1"
+                      Fill="Transparent"/>
+            </Button>
+            <Button Classes="titlebar-button close" Click="Close_Click" ToolTip.Tip="Close">
+                <Path Data="M 0,0 L 10,10 M 10,0 L 0,10"
+                      Stroke="{Binding $parent[Button].Foreground}"
+                      StrokeThickness="1.2"/>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

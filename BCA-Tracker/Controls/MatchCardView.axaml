@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Controls.MatchCardView"
+             Margin="0,0,0,8">
+
+    <Button x:Name="Root" Classes="card-button match-card" Click="Root_Click">
+        <Grid ColumnDefinitions="4,200,*,Auto,Auto">
+
+            <!-- Win/loss bar -->
+            <Border x:Name="ResultBar" Grid.Column="0" CornerRadius="3,0,0,3"/>
+
+            <!-- Map / mode / time-ago -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,16">
+                <TextBlock x:Name="MapText" Classes="section-title"/>
+                <TextBlock x:Name="ModeAgoText" Classes="label" Margin="0,2,0,0"/>
+            </StackPanel>
+
+            <!-- Result + loadout -->
+            <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="20,0">
+                <TextBlock x:Name="ResultText" Classes="label"/>
+                <TextBlock x:Name="LoadoutText" Classes="muted" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <!-- KDA -->
+            <StackPanel Grid.Column="3" Orientation="Horizontal"
+                        VerticalAlignment="Center" Margin="0,0,20,0">
+                <Border Width="1" Background="{DynamicResource Border.Subtle}" Margin="20,12"/>
+                <StackPanel Margin="20,0,8,0">
+                    <TextBlock x:Name="KdaText" Classes="stat-mid"/>
+                    <TextBlock Classes="label" Text="K / D / A" Margin="0,2,0,0"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- K/D ratio -->
+            <StackPanel Grid.Column="4" Margin="20,0,28,0" VerticalAlignment="Center">
+                <TextBlock x:Name="KdRatioText" Classes="stat-mid"/>
+                <TextBlock Classes="label" Text="K/D" Margin="0,2,0,0"/>
+            </StackPanel>
+        </Grid>
+    </Button>
+</UserControl>

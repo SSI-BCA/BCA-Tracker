@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Views.MapsPage">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,24,32,32">
+            <TextBlock Classes="page-title" Text="Maps"/>
+            <TextBlock x:Name="SubtitleText" Classes="muted" Margin="0,4,0,20"/>
+
+            <Border Classes="card" Padding="0">
+                <StackPanel x:Name="RowsHost" Grid.IsSharedSizeScope="True"/>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

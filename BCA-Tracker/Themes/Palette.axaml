@@ -1,0 +1,112 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        ╔════════════════════════════════════════════════════════════════════╗
+        ║ Palette — every colour the app uses, named.                        ║
+        ║                                                                    ║
+        ║ Edit this file to recolour the entire app. Other files reference   ║
+        ║ these resources by key via DynamicResource — when you change a     ║
+        ║ value here at runtime (in DevTools, or via theme switching), the   ║
+        ║ whole app updates.                                                 ║
+        ║                                                                    ║
+        ║ Naming:                                                            ║
+        ║   Bg.*       — surfaces                                            ║
+        ║   Fg.*       — foreground (text, icons)                            ║
+        ║   Border.*   — separators                                          ║
+        ║   Accent.*   — primary highlights (blueviolet)                     ║
+        ║   Danger.*   — destructive / loss / errors (red)                   ║
+        ║   Good.*     — success / wins                                      ║
+        ║   Team.*     — scoreboard team colours                             ║
+        ╚════════════════════════════════════════════════════════════════════╝
+    -->
+
+    <!-- ── Surfaces ───────────────────────────────────────────────────── -->
+    <Color x:Key="Bg.Base.Color">#0A0B10</Color>
+    <Color x:Key="Bg.Nav.Color">#0E1018</Color>
+    <Color x:Key="Bg.Surface.Color">#13151F</Color>
+    <Color x:Key="Bg.SurfaceHover.Color">#1A1D2A</Color>
+    <Color x:Key="Bg.SurfaceRaised.Color">#1F2333</Color>
+    <Color x:Key="Bg.Inset.Color">#070810</Color>
+
+    <SolidColorBrush x:Key="Bg.Base"          Color="{DynamicResource Bg.Base.Color}"/>
+    <SolidColorBrush x:Key="Bg.Nav"           Color="{DynamicResource Bg.Nav.Color}"/>
+    <SolidColorBrush x:Key="Bg.Surface"       Color="{DynamicResource Bg.Surface.Color}"/>
+    <SolidColorBrush x:Key="Bg.SurfaceHover"  Color="{DynamicResource Bg.SurfaceHover.Color}"/>
+    <SolidColorBrush x:Key="Bg.SurfaceRaised" Color="{DynamicResource Bg.SurfaceRaised.Color}"/>
+    <SolidColorBrush x:Key="Bg.Inset"         Color="{DynamicResource Bg.Inset.Color}"/>
+
+    <!-- ── Foreground ─────────────────────────────────────────────────── -->
+    <Color x:Key="Fg.Primary.Color">#ECEEF5</Color>
+    <Color x:Key="Fg.Secondary.Color">#A6ABBF</Color>
+    <Color x:Key="Fg.Muted.Color">#6B7184</Color>
+    <Color x:Key="Fg.Disabled.Color">#3F4456</Color>
+
+    <SolidColorBrush x:Key="Fg.Primary"   Color="{DynamicResource Fg.Primary.Color}"/>
+    <SolidColorBrush x:Key="Fg.Secondary" Color="{DynamicResource Fg.Secondary.Color}"/>
+    <SolidColorBrush x:Key="Fg.Muted"     Color="{DynamicResource Fg.Muted.Color}"/>
+    <SolidColorBrush x:Key="Fg.Disabled"  Color="{DynamicResource Fg.Disabled.Color}"/>
+
+    <!-- ── Borders ────────────────────────────────────────────────────── -->
+    <Color x:Key="Border.Subtle.Color">#1E2230</Color>
+    <Color x:Key="Border.Default.Color">#2A2F40</Color>
+    <Color x:Key="Border.Strong.Color">#3A4058</Color>
+
+    <SolidColorBrush x:Key="Border.Subtle"  Color="{DynamicResource Border.Subtle.Color}"/>
+    <SolidColorBrush x:Key="Border.Default" Color="{DynamicResource Border.Default.Color}"/>
+    <SolidColorBrush x:Key="Border.Strong"  Color="{DynamicResource Border.Strong.Color}"/>
+
+    <!-- ── Accent (blueviolet) ────────────────────────────────────────── -->
+    <Color x:Key="Accent.Color">#8B5CF6</Color>
+    <Color x:Key="Accent.Hover.Color">#A78BFA</Color>
+    <Color x:Key="Accent.Pressed.Color">#7C3AED</Color>
+    <Color x:Key="Accent.Glow.Color">#188B5CF6</Color>
+
+    <SolidColorBrush x:Key="Accent"         Color="{DynamicResource Accent.Color}"/>
+    <SolidColorBrush x:Key="Accent.Hover"   Color="{DynamicResource Accent.Hover.Color}"/>
+    <SolidColorBrush x:Key="Accent.Pressed" Color="{DynamicResource Accent.Pressed.Color}"/>
+    <SolidColorBrush x:Key="Accent.Glow"    Color="{DynamicResource Accent.Glow.Color}"/>
+
+    <!-- ── Danger (red) ───────────────────────────────────────────────── -->
+    <Color x:Key="Danger.Color">#EF4444</Color>
+    <Color x:Key="Danger.Hover.Color">#F87171</Color>
+    <Color x:Key="Danger.Glow.Color">#18EF4444</Color>
+
+    <SolidColorBrush x:Key="Danger"       Color="{DynamicResource Danger.Color}"/>
+    <SolidColorBrush x:Key="Danger.Hover" Color="{DynamicResource Danger.Hover.Color}"/>
+    <SolidColorBrush x:Key="Danger.Glow"  Color="{DynamicResource Danger.Glow.Color}"/>
+
+    <!-- ── Good (green) ───────────────────────────────────────────────── -->
+    <Color x:Key="Good.Color">#10B981</Color>
+    <Color x:Key="Good.Glow.Color">#1810B981</Color>
+
+    <SolidColorBrush x:Key="Good"      Color="{DynamicResource Good.Color}"/>
+    <SolidColorBrush x:Key="Good.Glow" Color="{DynamicResource Good.Glow.Color}"/>
+
+    <!-- ── Team colours ───────────────────────────────────────────────── -->
+    <Color x:Key="Team.A.Color">#3B82F6</Color>
+    <Color x:Key="Team.B.Color">#F59E0B</Color>
+
+    <SolidColorBrush x:Key="Team.A" Color="{DynamicResource Team.A.Color}"/>
+    <SolidColorBrush x:Key="Team.B" Color="{DynamicResource Team.B.Color}"/>
+
+    <!-- ── Gradients ──────────────────────────────────────────────────── -->
+    <LinearGradientBrush x:Key="Accent.Gradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{DynamicResource Accent.Color}"  Offset="0"/>
+        <GradientStop Color="{DynamicResource Danger.Color}"  Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="Accent.AreaFade" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#558B5CF6" Offset="0"/>
+        <GradientStop Color="#008B5CF6" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- ── Fonts ──────────────────────────────────────────────────────── -->
+    <!-- Inter is bundled by Avalonia via WithInterFont() in Program.cs.
+         We use it for both body and display weights. To swap to Rajdhani
+         for display later: drop the .ttf into Resources/Fonts and
+         change Font.Display to "avares://BCA-Tracker/Resources/Fonts/#Rajdhani". -->
+    <FontFamily x:Key="Font.Body">Inter, Segoe UI, Arial</FontFamily>
+    <FontFamily x:Key="Font.Display">Inter, Segoe UI, Arial</FontFamily>
+
+</ResourceDictionary>

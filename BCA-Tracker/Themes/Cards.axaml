@@ -1,0 +1,82 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        ╔════════════════════════════════════════════════════════════════════╗
+        ║ Cards — building blocks for pages.                                 ║
+        ║                                                                    ║
+        ║ Static card:                                                       ║
+        ║   <Border Classes="card">…</Border>                                ║
+        ║                                                                    ║
+        ║ Stat-tile card (smaller, for big-number tiles):                    ║
+        ║   <Border Classes="card stat-tile">…</Border>                      ║
+        ║                                                                    ║
+        ║ Interactive card (Button styled as a card):                        ║
+        ║   <Button Classes="card-button">…</Button>                         ║
+        ║                                                                    ║
+        ║ Match card (extends card-button, has the win/loss bar slot):       ║
+        ║   <Button Classes="card-button match-card">…</Button>              ║
+        ║                                                                    ║
+        ║ Player row (for scoreboards):                                      ║
+        ║   <Border Classes="player-row">…</Border>                          ║
+        ╚════════════════════════════════════════════════════════════════════╝
+    -->
+
+    <!-- Static surface card -->
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource Bg.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="3"/>
+        <Setter Property="Padding" Value="20"/>
+    </Style>
+
+    <Style Selector="Border.stat-tile">
+        <Setter Property="Padding" Value="20,16"/>
+        <Setter Property="MinWidth" Value="140"/>
+        <Setter Property="MinHeight" Value="92"/>
+    </Style>
+
+    <Style Selector="Border.player-row">
+        <Setter Property="Background" Value="{DynamicResource Bg.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="2"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinHeight" Value="48"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+
+    <!-- Interactive card — Button that looks like a card. -->
+    <Style Selector="Button.card-button">
+        <Setter Property="Background" Value="{DynamicResource Bg.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="3"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background"  Duration="0:0:0.12"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.12"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.card-button:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Bg.SurfaceHover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+    </Style>
+
+    <Style Selector="Button.card-button:pressed">
+        <Setter Property="Background" Value="{DynamicResource Bg.SurfaceRaised}"/>
+    </Style>
+
+    <Style Selector="Button.match-card">
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="MinHeight" Value="84"/>
+    </Style>
+
+</Styles>

@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Views.MatchHistoryPage">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="32,24,32,32" RowDefinitions="Auto,Auto,*">
+
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Classes="page-title" Text="Match History"/>
+                <TextBlock x:Name="SubtitleText" Classes="muted" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <Border Grid.Row="1" Classes="card" Padding="16,12" Margin="0,0,0,16">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Map:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               Foreground="{DynamicResource Fg.Secondary}"/>
+                    <ComboBox x:Name="MapFilter" Width="180" Margin="0,0,16,0"
+                              SelectionChanged="Filter_Changed"/>
+
+                    <TextBlock Text="Mode:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               Foreground="{DynamicResource Fg.Secondary}"/>
+                    <ComboBox x:Name="ModeFilter" Width="180" Margin="0,0,16,0"
+                              SelectionChanged="Filter_Changed"/>
+
+                    <CheckBox x:Name="WinsOnlyCheck"
+                              Content="Wins only"
+                              VerticalAlignment="Center"
+                              Margin="0,0,16,0"
+                              IsCheckedChanged="Filter_Changed"/>
+
+                    <Button Content="Reset" Click="Reset_Click"/>
+                </StackPanel>
+            </Border>
+
+            <ItemsControl Grid.Row="2" x:Name="MatchList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

@@ -1,91 +1,73 @@
 # BCA-Tracker
 
-External memory reader for Battle Core Arena (UE5.1, Ubisoft, P2P, EAC disabled).
-Reads live match stats, kill feed, lobby info and post-match summaries via
-ReadProcessMemory; saves matches as JSON under `%AppData%\BCA-Hub\matches\`.
+External memory reader and match tracker for Battle Core Arena
+(UE5.1, P2P, EAC disabled).
+
+## Solution layout
+
+```
+BCA-Tracker.slnx
+├── BCA-Tracker.Core/        Class library — memory reader, match logic.
+│   ├── Memory/              FNameResolver, MemoryReader, KillFeedTracker
+│   ├── Game/                Offsets, Enums, runtime models
+│   ├── Match/               MatchSaver, MatchRecord (now incl. AccountId)
+│   └── Diagnostics/         DiagLog
+│
+├── BCA-Tracker.Legacy/      Console exe (the original alpha tracker).
+│
+└── BCA-Tracker/             Avalonia desktop app (user-facing).
+    ├── Program.cs           Avalonia bootstrap
+    ├── App.axaml            Application + theme dictionaries
+    ├── LauncherWindow.axaml "New UI" / "Legacy" picker
+    ├── MainWindow.axaml     TitleBar + TopNav + page host + status bar
+    ├── Themes/              Palette, Typography, Controls, Cards
+    ├── Controls/            TitleBar, TopNav, MatchCardView, NavItem
+    ├── Views/               Pages (Home + 6 placeholders)
+    └── Services/            AppPaths, AppSettings, AppServices, MatchStore, Stats
+```
+
+## What's new in v4
+
+- **Switched WPF → Avalonia 12.** Same C#, similar XAML, much better defaults.
+  The custom theme is a fresh build on top of `SimpleTheme`.
+- **AccountId field on PlayerRecord.** Forward-compat for the future
+  reader update that captures the local player's stable Ubisoft account ID
+  from `APlayerState.UniqueId`. UI already uses it when present, falls
+  back to `IsLocalPlayer` when not. All existing matches deserialise fine
+  (the field is nullable).
+- **Home page is the only fully-built page.** Match History, Lifetime
+  Stats, Trends, Maps, Weapons are placeholders pending design feedback.
 
 ## Build
 
 ```
-dotnet build -c Release
+dotnet build BCA-Tracker.slnx -c Release
 ```
 
-Targets `net10.0`, x64. Run as Administrator (OpenProcess requires it).
+Targets `net10.0-windows`, x64. Avalonia 12.0.2 + Avalonia.Themes.Simple +
+Avalonia.Diagnostics (debug only — F12 opens DevTools at runtime).
 
-## Layout
+Open in Visual Studio 2026 / Rider / VS Code with the Avalonia for VS Code
+extension. Set `BCA-Tracker` as startup, F5.
 
-| File | Role |
-|---|---|
-| `Program.cs` | Entry point, attach loop, main tick. |
-| `Memory/MemoryReader.cs` | Pointer chains, snapshot read, GS class detection. |
-| `Memory/FNameResolver.cs` | Locates `FNamePool` and resolves comparison indices to strings. |
-| `Memory/KillFeedTracker.cs` | Diff-based kill detection from `HitHistory` arrays. |
-| `Core/Offsets.cs` | All static offsets, captured from the Dumper-7 SDK. |
-| `Core/Enums.cs` | Weapon/Ability/Module/GameMode/GameState lookup tables and the row-name to display-name maps. |
-| `Core/MatchSaver.cs` | Caches lobby map/mode and writes JSON on post-match exit. |
-| `Core/MatchRecord.cs` | JSON DTOs. |
-| `Core/Models.cs` | Runtime snapshot model used by the UI and saver. |
-| `Core/Diaglog.cs` | Diagnostic log writer (`%AppData%\BCA-Hub\diag.log`). |
-| `UI/ConsoleUI.cs` | Terminal renderer. |
+## Theming
+
+`Themes/Palette.axaml` is the only file you edit to recolour the entire
+app. Every brush in every other file references its keys via
+`DynamicResource`, so changes propagate immediately.
+
+| File              | What's in it                                       |
+|-------------------|----------------------------------------------------|
+| `Palette.axaml`   | Colours + brushes + font families. ResourceDict.   |
+| `Typography.axaml`| Text class selectors (`page-title`, `label`, etc.) |
+| `Controls.axaml`  | Button, TextBox, CheckBox, ComboBox restyles.      |
+| `Cards.axaml`     | `card`, `stat-tile`, `card-button`, `match-card`.  |
 
 ## Diagnostics
 
-Two log files are written under `%AppData%\BCA-Hub\`:
+Two log files under `%AppData%\BCA-Hub\` (legacy folder):
 
-- `diag.log` — process attach, GS classification, lobby caching, save triggers, exceptions.
-- `fname_resolver.log` — FNamePool location attempts and resolutions.
+- `diag.log` — process attach, GS classification, save triggers.
+- `fname_resolver.log` — FNamePool location attempts.
 
-## Changes since alpha v0.13
-
-- **Fixed lobby detection (round 2: UClass-based).** The first round used a
-  structural fingerprint at offsets 0x328/0x338. That worked while the user
-  was actually in a `CustomGameGS_C`, but after a match the GameState
-  pointer transitions through `MainMenuGS_C` (only 0x308 bytes long), and
-  reads at 0x328/0x338 returned heap junk that happened to look like
-  FNames. The classifier now reads `UObject.ClassPrivate` and resolves the
-  UClass FName directly, comparing against the known names
-  (`CustomGameGS_C`, `ArenaTeamGS_C`, `BackupGS_C`, `BackupFFAGS_C`,
-  `GoldenCoreGS_C`, `BCATutorialGS_C`, `TestMapGS_C`, `MainMenuGS_C`). The
-  structural fingerprint is kept as a fallback for the rare case where
-  FNameResolver hasn't bootstrapped yet.
-
-- **Added `Backup_Casual` to the mode row-name lookup.** The previous table
-  had `Backup3v3`, `GoldenCore3v3`, `BackupFFA` — those were guesses based
-  on the EGameMode enum. The actual data table key for casual 3v3 is
-  `Backup_Casual`. Other modes will appear as `Unknown (<row_name>)` in
-  the UI; `diag.log` will show the raw row name in
-  `[FName] Mode idx=... raw="..." — no display name match`. Add new entries
-  to `Enums.cs::_modeRowToDisplay` as you encounter them.
-
-- **`ReadUObjectClassName` now caches its last resolution.** The diag log
-  used to print one `[Mem] GS UObject: ...` line per tick (~2/s). Now it
-  only prints when the class FName actually changes, keeping the log
-  readable.
-
-## Changes in alpha v0.13 → v0.14 (round 1)
-
-- **Fixed lobby detection (initial round).** Replaced the broken
-  `gsStateByte > 13` check with a 6-byte FName-shape signature on
-  `ArenaRowName` and `GameModeRowName`.
-
-- **Fixed FName resolution.** Three bugs in `FNameResolver`:
-  1. PE section size was read from `SizeOfRawData` (offset +16) instead of
-     `VirtualSize` (offset +8). On `BattleCoreArena.exe` the on-disk size
-     for `.data` reads as 0, so Strategy 2's section scan never ran.
-  2. The byte-offset within an FNamePool block was treated as raw bytes,
-     but UE 5.1 stores it as a count of `FNameEntryAllocator::Stride`-byte
-     units (Stride = 2 on Windows). Names other than `"None"` (which is at
-     offset 0 either way) were misread.
-  3. The `bIsWide` flag was extracted from bit 5 of the entry header
-     instead of bit 0 (it sits next to a 5-bit `LowercaseProbeHash`,
-     not at the top of the byte). Wide-character names would be misread
-     even when the pool was correctly located.
-
-- **Strategy 1 now also recognises the `cmp byte ptr [rip+disp], 0` pattern
-  used by MSVC for static one-time-init guards**, which sits at the end of
-  the `FNamePool` struct, and uses it to back-compute the pool base. This
-  is a hint, not a primary mechanism — Strategy 2's structural scan is the
-  reliable fallback.
-
-- **Removed `Memory/DllInjector.cs`.** The plan to inject a C++ helper that
-  calls `Conv_StringToName` is no longer needed.
+UI crashes write to `%AppData%\BCA-Tracker\crash.log`.

@@ -3,7 +3,13 @@
     <Platform Name="Any CPU" />
     <Platform Name="x64" />
   </Configurations>
-  <Project Path="BCA-Tracker.csproj">
+  <Project Path="BCA-Tracker/BCA-Tracker.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="BCA-Tracker.Core/BCA-Tracker.Core.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="BCA-Tracker.Legacy/BCA-Tracker.Legacy.csproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
 </Solution>

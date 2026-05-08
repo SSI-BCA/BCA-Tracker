@@ -1,0 +1,147 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Views.MatchDetailPage">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="32,24,32,32" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+
+            <!-- Back -->
+            <Button Grid.Row="0" Classes="ghost"
+                    Click="Back_Click"
+                    Content="← Match History"
+                    Margin="0,0,0,12"
+                    HorizontalAlignment="Left"/>
+
+            <!-- Header strip: outcome, map/mode, time -->
+            <Border Grid.Row="1" Classes="card" Padding="20,16" Margin="0,0,0,16">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                    <TextBlock x:Name="OutcomeText" Grid.Column="0"
+                               FontFamily="{DynamicResource Font.Display}"
+                               FontSize="32"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="MapText" Classes="section-title"/>
+                        <TextBlock x:Name="ModeText" Classes="muted" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="20,0" VerticalAlignment="Center">
+                        <TextBlock Classes="label" Text="DURATION" HorizontalAlignment="Right"/>
+                        <TextBlock x:Name="DurationText"
+                                   Classes="stat-mid"
+                                   FontSize="20"
+                                   HorizontalAlignment="Right"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Margin="20,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Classes="label" Text="WHEN" HorizontalAlignment="Right"/>
+                        <TextBlock x:Name="WhenText"
+                                   Classes="muted"
+                                   FontSize="13"
+                                   HorizontalAlignment="Right"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Your hero stats -->
+            <TextBlock Grid.Row="2" Classes="section-title" Text="YOUR PERFORMANCE" Margin="0,0,0,12"/>
+            <UniformGrid Grid.Row="3" Columns="5" Rows="1" Margin="0,0,0,24">
+                <Border Classes="card stat-tile" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Classes="label" Text="K/D/A"/>
+                        <TextBlock x:Name="MeKdaText" Classes="stat-value"/>
+                    </StackPanel>
+                </Border>
+                <Border Classes="card stat-tile" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Classes="label" Text="K/D RATIO"/>
+                        <TextBlock x:Name="MeKdRatioText" Classes="stat-value"/>
+                    </StackPanel>
+                </Border>
+                <Border Classes="card stat-tile" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Classes="label" Text="DAMAGE"/>
+                        <TextBlock x:Name="MeDamageText" Classes="stat-value"/>
+                    </StackPanel>
+                </Border>
+                <Border Classes="card stat-tile" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Classes="label" Text="ACCURACY"/>
+                        <TextBlock x:Name="MeAccText" Classes="stat-value"/>
+                    </StackPanel>
+                </Border>
+                <Border Classes="card stat-tile">
+                    <StackPanel>
+                        <TextBlock Classes="label" Text="HEAL"/>
+                        <TextBlock x:Name="MeHealText" Classes="stat-value"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Highlights -->
+            <Border Grid.Row="4" Classes="card" Padding="20,16" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="HIGHLIGHTS" Margin="0,0,0,12"/>
+                    <ItemsControl x:Name="HighlightsHost">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                    <TextBlock x:Name="NoHighlightsText"
+                               Classes="muted"
+                               Text="Nothing notable this match."
+                               IsVisible="False"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Scoreboard + Kill Feed -->
+            <Grid Grid.Row="5" ColumnDefinitions="*,360" Margin="0,0,0,16">
+
+                <Border Grid.Column="0" Classes="card" Padding="0" Margin="0,0,12,0">
+                    <Grid RowDefinitions="Auto,Auto,*">
+                        <Border Grid.Row="0" BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="0,0,0,1" Padding="20,14">
+                            <TextBlock Classes="section-title" Text="FULL SCOREBOARD"/>
+                        </Border>
+                        <Grid Grid.Row="1"
+                              ColumnDefinitions="4,*,1,110,1,80,1,80,1,*"
+                              Margin="20,8,20,8">
+                            <TextBlock Grid.Column="1" Classes="label" Text="PLAYER"
+                                       Margin="12,0,12,0"/>
+                            <TextBlock Grid.Column="3" Classes="label" Text="K / D / A"
+                                       Margin="0,0,16,0" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Column="5" Classes="label" Text="DAMAGE"
+                                       Margin="0,0,16,0" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Column="7" Classes="label" Text="ACC."
+                                       Margin="0,0,16,0" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Column="9" Classes="label" Text="LOADOUT"
+                                       Margin="12,0,0,0"/>
+                        </Grid>
+                        <StackPanel x:Name="ScoreboardHost" Grid.Row="2" Margin="20,4,20,12"/>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Classes="card" Padding="0">
+                    <Grid RowDefinitions="Auto,*">
+                        <Border Grid.Row="0" BorderBrush="{DynamicResource Border.Subtle}"
+                                BorderThickness="0,0,0,1" Padding="20,14">
+                            <TextBlock Classes="section-title" Text="KILL FEED"/>
+                        </Border>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="KillFeedHost" Margin="16,8,16,8"/>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Detailed stats table for the local player -->
+            <Border Grid.Row="6" Classes="card" Padding="20,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="DETAILED STATS" Margin="0,0,0,12"/>
+                    <Grid x:Name="DetailedStatsGrid"
+                          ColumnDefinitions="*,*,*,*"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

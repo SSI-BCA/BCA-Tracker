@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Views.HomePage">
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <Grid Margin="32,24,32,32"
+              RowDefinitions="Auto,Auto,Auto,Auto">
+
+            <!-- ═════ HERO STRIP ════════════════════════════════════════════ -->
+            <Grid Grid.Row="0" Margin="0,0,0,16" ColumnDefinitions="280,*">
+
+                <!-- Identity card -->
+                <Border Grid.Column="0" Classes="card" Margin="0,0,12,0">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <!-- Avatar. Either a clipped Image (if user set one in
+                             Settings) OR a gradient ellipse with the first
+                             letter of their handle. We toggle visibility from
+                             code-behind. -->
+                        <Panel Width="64" Height="64" HorizontalAlignment="Center">
+                            <Border x:Name="AvatarFallback"
+                                    CornerRadius="32"
+                                    Background="{DynamicResource Accent.Gradient}">
+                                <TextBlock x:Name="AvatarInitial"
+                                           Foreground="#FFFFFF"
+                                           FontFamily="{DynamicResource Font.Display}"
+                                           FontSize="28"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"/>
+                            </Border>
+                            <Border x:Name="AvatarImageHost"
+                                    CornerRadius="32"
+                                    ClipToBounds="True"
+                                    IsVisible="False">
+                                <Image x:Name="AvatarImage"
+                                       Stretch="UniformToFill"/>
+                            </Border>
+                        </Panel>
+
+                        <TextBlock x:Name="HandleText"
+                                   Margin="0,12,0,2"
+                                   HorizontalAlignment="Center"
+                                   FontFamily="{DynamicResource Font.Display}"
+                                   FontSize="20"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource Fg.Primary}"/>
+                        <TextBlock x:Name="MatchCountText"
+                                   Classes="label"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 4 hero stat tiles -->
+                <UniformGrid Grid.Column="1" Columns="4" Rows="1">
+                    <Border Classes="card stat-tile" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="WIN %"/>
+                            <TextBlock x:Name="WinPctText" Classes="stat-value"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="card stat-tile" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="K/D"/>
+                            <TextBlock x:Name="KdText" Classes="stat-value"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="card stat-tile" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="ACCURACY"/>
+                            <TextBlock x:Name="AccuracyText" Classes="stat-value"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="card stat-tile">
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="DAMAGE / MATCH"/>
+                            <TextBlock x:Name="DmgText" Classes="stat-value"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+            </Grid>
+
+            <!-- ═════ SUB-STATS ROW ═════════════════════════════════════════ -->
+            <Grid Grid.Row="1" Margin="0,0,0,32" ColumnDefinitions="280,*">
+
+                <!-- Wins/Losses/Matches/Kills/Deaths/Assists -->
+                <Border Grid.Column="0" Classes="card" Margin="0,0,12,0">
+                    <UniformGrid Columns="3" Rows="2">
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Classes="label" Text="WINS"/>
+                            <TextBlock x:Name="WinsText"
+                                       Classes="stat-mid good"
+                                       FontSize="22"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Classes="label" Text="LOSSES"/>
+                            <TextBlock x:Name="LossesText"
+                                       Classes="stat-mid danger"
+                                       FontSize="22"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,12">
+                            <TextBlock Classes="label" Text="MATCHES"/>
+                            <TextBlock x:Name="MatchesText" Classes="stat-mid" FontSize="22"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="KILLS"/>
+                            <TextBlock x:Name="KillsText" Classes="stat-mid" FontSize="22"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="DEATHS"/>
+                            <TextBlock x:Name="DeathsText" Classes="stat-mid" FontSize="22"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Classes="label" Text="ASSISTS"/>
+                            <TextBlock x:Name="AssistsText" Classes="stat-mid" FontSize="22"/>
+                        </StackPanel>
+                    </UniformGrid>
+                </Border>
+
+                <!-- Favourites -->
+                <Border Grid.Column="1" Classes="card">
+                    <Grid ColumnDefinitions="*,*,*">
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Classes="label" Text="FAVOURITE MAP"/>
+                            <TextBlock x:Name="FavMapText"
+                                       Classes="section-title accent"
+                                       Margin="0,4,0,0"/>
+                            <TextBlock x:Name="FavMapSubText"
+                                       Classes="muted"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                            <TextBlock Classes="label" Text="FAVOURITE WEAPON"/>
+                            <TextBlock x:Name="FavWeaponText"
+                                       Classes="section-title accent"
+                                       Margin="0,4,0,0"/>
+                            <TextBlock x:Name="FavWeaponSubText"
+                                       Classes="muted"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Margin="20,0,0,0">
+                            <TextBlock Classes="label" Text="FAVOURITE ABILITY"/>
+                            <TextBlock x:Name="FavAbilityText"
+                                       Classes="section-title accent"
+                                       Margin="0,4,0,0"/>
+                            <TextBlock x:Name="FavAbilitySubText"
+                                       Classes="muted"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- ═════ RECENT MATCHES ════════════════════════════════════════ -->
+            <Grid Grid.Row="2" Margin="0,0,0,12" ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Classes="section-title" Text="RECENT MATCHES"/>
+                <TextBlock x:Name="RecentSubtitle" Grid.Column="1" Classes="muted"
+                           VerticalAlignment="Bottom"/>
+            </Grid>
+
+            <ItemsControl Grid.Row="3" x:Name="RecentList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+
+        </Grid>
+    </ScrollViewer>
+</UserControl>
