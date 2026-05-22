@@ -6,24 +6,44 @@
         <StackPanel Margin="32,24,32,32" MaxWidth="800" HorizontalAlignment="Left">
             <TextBlock Classes="page-title" Text="Settings"/>
             <TextBlock Classes="muted" Margin="0,4,0,24"
-                       Text="Paths and launcher preferences. Saved to %AppData%\BCA-Tracker\settings.json."/>
+                       Text="Configure data submission, paths and integrations. Saved to %AppData%\BCA-Tracker\settings.json."/>
 
-            <!-- Launcher -->
+            <!-- Data submission -->
             <Border Classes="card" Margin="0,0,0,16">
                 <StackPanel>
-                    <TextBlock Classes="section-title" Text="Launcher" Margin="0,0,0,12"/>
-                    <CheckBox x:Name="RememberCheck"
-                              Content="Skip the launcher and always open my preferred UI"
-                              IsCheckedChanged="Remember_Changed"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                        <TextBlock Text="Preferred UI:" VerticalAlignment="Center" Margin="0,0,12,0"
-                                   Foreground="{DynamicResource Fg.Secondary}"/>
-                        <ComboBox x:Name="PreferredUICombo" Width="180"
-                                  SelectionChanged="PreferredUI_Changed">
-                            <ComboBoxItem Content="New UI" Tag="Modern"/>
-                            <ComboBoxItem Content="Legacy console" Tag="Legacy"/>
-                        </ComboBox>
-                    </StackPanel>
+                    <TextBlock Classes="section-title" Text="Data submission" Margin="0,0,0,12"/>
+                    <CheckBox x:Name="DataSubmissionCheck"
+                              Content="Upload my finished matches to the community server"
+                              IsCheckedChanged="DataSubmission_Changed"/>
+                    <TextBlock Classes="caption" Margin="0,4,0,0"
+                               TextWrapping="Wrap"
+                               Text="When enabled, finished match files are uploaded in the background. They contain scoreboard, kill feed, loadouts and stat counters — same data the kill feed shows in-game. No Steam/Epic IDs, IP addresses or Windows usernames are uploaded."/>
+
+                    <TextBlock Classes="label" Text="SERVER ENDPOINT" Margin="0,12,0,4"/>
+                    <TextBox x:Name="EndpointBox"
+                             Watermark="https://example.com (leave blank to disable)"
+                             LostFocus="Endpoint_LostFocus"/>
+                    <TextBlock Classes="caption" Margin="0,4,0,0"
+                               Text="Uploads POST to {endpoint}/v1/matches. Leave blank if you don't want to upload anywhere — the toggle above will then sit idle."/>
+
+                    <TextBlock Classes="label" Text="ANONYMOUS INSTALLATION ID" Margin="0,12,0,4"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox x:Name="AccountIdBox"
+                                 Grid.Column="0"
+                                 IsReadOnly="True"
+                                 FontFamily="Consolas, monospace"/>
+                        <Button Grid.Column="1" Content="Reset to fresh ID"
+                                Margin="8,0,0,0"
+                                Click="ResetAccountId_Click"/>
+                    </Grid>
+                    <TextBlock Classes="caption" Margin="0,4,0,0"
+                               Text="Random GUID sent with each upload so the server can group your matches together. Resetting it makes future uploads count as a different player."/>
+
+                    <TextBlock Classes="label" Text="UPLOAD STATUS" Margin="0,12,0,4"/>
+                    <TextBlock x:Name="UploadStatusText"
+                               Classes="muted"
+                               FontFamily="Consolas, monospace"
+                               Text="(idle)"/>
                 </StackPanel>
             </Border>
 

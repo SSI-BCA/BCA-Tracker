@@ -19,10 +19,15 @@ namespace BCATracker.Core
         public const int GS_PlayerArray_Count = 0x2B0;
 
         // CustomGameGS_C  (lobby)
+        public const int CGS_GameName        = 0x310;  // FText (0x18) — display name typed by host
         public const int CGS_ArenaRowName    = 0x328;
         public const int CGS_GameModeRowName = 0x338;
         public const int CGS_BotCountT1      = 0x390;
         public const int CGS_BotCountT2      = 0x394;
+        public const int CGS_LobbyPassword   = 0x3D0;  // FGuid (16 bytes) — 0 if no password
+        public const int CGS_ConnectedPlayersArr_Data  = 0x3F0;  // TArray<PS*> data ptr
+        public const int CGS_ConnectedPlayersArr_Count = 0x3F8;  // TArray count (int32)
+        public const int CGS_MaxTeamSize     = 0x418;
 
         // ArenaTeamGS_C  (in-match)
         public const int AGS_GameState  = 0x369;
@@ -51,6 +56,19 @@ namespace BCATracker.Core
 
         // MainMenuHUD_C
         public const int MMHUD_MainMenuState = 0x428;
+
+        // ── CustomGamePS_C (lobby player state, base = 0x03C0) ──────────────────
+        // Different layout from in-match ArenaTeamPS_C. Only used while
+        // the GameState class is CustomGameGS_C.
+        public const int CPS_Team             = 0x3D8;  // int32  — same as PS_Team but at a different offset
+        public const int CPS_IsGameLeader     = 0x3F4;  // bool   — IS THE HOST of the lobby
+        public const int CPS_CustomProfileID  = 0x3F8;  // FGuid  — stable per-player ID; replaces our random GUID
+
+        // Engine-level APlayerState fields (parent of every PS variant).
+        // These work for both lobby and in-match player states because
+        // the engine-level fields live before the BCA-specific overlays.
+        public const int APS_PlayerNamePrivate = 0x388;  // FString — display name
+        public const int APS_bIsABot_Byte      = 0x29A;  // bIsABot is bit 3 of this byte
 
         // ── ArenaTeamPS_C (universal player state, base = 0x03C0) ────────────────
         public const int PS_HitHistory             = 0x3C8;  // UHitHistory_C*

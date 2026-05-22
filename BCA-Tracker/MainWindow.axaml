@@ -10,7 +10,7 @@
         Background="{DynamicResource Bg.Base}">
 
     <Border Background="{DynamicResource Bg.Base}">
-        <Grid RowDefinitions="Auto,*,Auto">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
 
             <Border Grid.Row="0"
                     BorderBrush="{DynamicResource Border.Subtle}"
@@ -18,12 +18,41 @@
                 <ctl:TopNav x:Name="Nav"/>
             </Border>
 
+            <!-- Update banner — shown only when UpdateChecker reports a
+                 newer release on GitHub. Slim, dismissable, doesn't
+                 push content around when hidden. -->
+            <Border Grid.Row="1"
+                    x:Name="UpdateBanner"
+                    IsVisible="False"
+                    Background="#1F2A5BE0"
+                    BorderBrush="#5B8DEF"
+                    BorderThickness="0,0,0,1"
+                    Padding="20,10">
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock Grid.Column="0"
+                               x:Name="UpdateBannerText"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Fg.Primary}"
+                               Text="Update available."/>
+                    <Button Grid.Column="1"
+                            x:Name="UpdateDownloadBtn"
+                            Content="Download &amp; install"
+                            Classes="primary"
+                            Margin="0,0,8,0"
+                            Click="UpdateDownload_Click"/>
+                    <Button Grid.Column="2"
+                            x:Name="UpdateDismissBtn"
+                            Content="Later"
+                            Click="UpdateDismiss_Click"/>
+                </Grid>
+            </Border>
+
             <ContentControl x:Name="ContentHost"
-                            Grid.Row="1"
+                            Grid.Row="2"
                             Background="Transparent"/>
 
             <!-- Status bar -->
-            <Border Grid.Row="2"
+            <Border Grid.Row="3"
                     Background="{DynamicResource Bg.Nav}"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource Border.Subtle}"

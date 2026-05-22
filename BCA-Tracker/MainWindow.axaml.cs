@@ -1,8 +1,13 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
+using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using BCATracker.Core;
 using BCATracker.UI.Controls;
 using BCATracker.UI.Services;
@@ -12,6 +17,9 @@ namespace BCATracker.UI;
 
 public partial class MainWindow : Window
 {
+    DispatcherTimer? _updateBannerTimer;
+    bool             _updateDismissedThisSession;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -33,13 +41,103 @@ public partial class MainWindow : Window
 
         Opened += (_, _) => NavigateTo(typeof(HomePage));
 
+        // Poll UpdateChecker for results. The check itself is fired
+        // off by AppServices.Initialise(); here we only watch for the
+        // result to land so we can show the banner. 5s poll is fine —
+        // a network round-trip takes longer than that anyway.
+        _updateBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _updateBannerTimer.Tick += (_, _) => RefreshUpdateBanner();
+        _updateBannerTimer.Start();
+        // Also try immediately in case the check finished before the
+        // window opened (unlikely but cheap).
+        RefreshUpdateBanner();
+
         Closed += (_, _) =>
         {
+            _updateBannerTimer?.Stop();
             live.Attached     -= UpdateStatusText;
             live.Detached     -= UpdateStatusText;
             live.MatchStarted -= OnMatchStarted;
             AppServices.Shutdown();
         };
+    }
+
+    void RefreshUpdateBanner()
+    {
+        try
+        {
+            var u = AppServices.UpdateChecker;
+            if (_updateDismissedThisSession || !u.UpdateAvailable)
+            {
+                UpdateBanner.IsVisible = false;
+                return;
+            }
+            UpdateBannerText.Text =
+                $"Update available: v{u.LatestVersion} (you have v{u.CurrentVersion}).";
+            UpdateBanner.IsVisible = true;
+        }
+        catch
+        {
+            // AppServices not ready yet or some other transient issue —
+            // just leave the banner hidden.
+        }
+    }
+
+    async void UpdateDownload_Click(object? sender, RoutedEventArgs e)
+    {
+        var u = AppServices.UpdateChecker;
+        if (string.IsNullOrEmpty(u.LatestSetupUrl)) return;
+
+        UpdateDownloadBtn.IsEnabled = false;
+        UpdateDownloadBtn.Content   = "Downloading…";
+
+        try
+        {
+            // Drop the new installer into %TEMP% with a distinctive name.
+            string tempPath = Path.Combine(
+                Path.GetTempPath(),
+                $"BCA-Tracker-Setup-{u.LatestVersion}.exe");
+            using (var http = new HttpClient())
+            {
+                http.Timeout = TimeSpan.FromMinutes(5);
+                using var stream = await http.GetStreamAsync(u.LatestSetupUrl);
+                using var file = File.Create(tempPath);
+                await stream.CopyToAsync(file);
+            }
+
+            DiagLog.Write($"[Update] Downloaded {tempPath}, launching installer.");
+
+            // Launch the installer, then quit so it can overwrite us.
+            // /SILENT shows progress without prompts; the user already
+            // agreed by clicking Download. Use /VERYSILENT instead if
+            // you want zero UI from the installer.
+            var psi = new ProcessStartInfo(tempPath)
+            {
+                UseShellExecute = true,
+                Arguments = "/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
+            };
+            Process.Start(psi);
+
+            // Give the installer a moment to fire up before we exit so
+            // Inno can see the running process and ask to close it.
+            await Task.Delay(500);
+            Close();
+        }
+        catch (Exception ex)
+        {
+            DiagLog.Write($"[Update] Download failed: {ex.Message}");
+            UpdateDownloadBtn.IsEnabled = true;
+            UpdateDownloadBtn.Content   = "Retry";
+            UpdateBannerText.Text       = $"Download failed: {ex.Message}";
+        }
+    }
+
+    void UpdateDismiss_Click(object? sender, RoutedEventArgs e)
+    {
+        // "Later" hides the banner for this session only — next launch
+        // it'll appear again if still applicable. No persistent state.
+        _updateDismissedThisSession = true;
+        UpdateBanner.IsVisible = false;
     }
 
     void BuildNav()
@@ -49,10 +147,10 @@ public partial class MainWindow : Window
         Nav.Items.Add(new NavItem("Live Match",     typeof(LiveMatchPage)));
         Nav.Items.Add(new NavItem("Home",           typeof(HomePage)));
         Nav.Items.Add(new NavItem("Match History",  typeof(MatchHistoryPage)));
-        Nav.Items.Add(new NavItem("Lifetime Stats", typeof(LifetimeStatsPage)));
         Nav.Items.Add(new NavItem("Trends",         typeof(TrendsPage)));
         Nav.Items.Add(new NavItem("Maps",           typeof(MapsPage)));
         Nav.Items.Add(new NavItem("Weapons",        typeof(WeaponsPage)));
+        Nav.Items.Add(new NavItem("Lobbies",        typeof(LobbyBrowserPage)));
         Nav.Items.Add(new NavItem("Settings",       typeof(SettingsPage)));
     }
 

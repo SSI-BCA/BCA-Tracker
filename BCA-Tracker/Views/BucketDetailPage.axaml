@@ -1,0 +1,165 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:BCATracker.UI.Controls"
+             x:Class="BCATracker.UI.Views.BucketDetailPage">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,24,32,32" MaxWidth="1280" HorizontalAlignment="Stretch">
+
+            <!-- Header — back button + kind label + bucket name -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <Button x:Name="BackBtn"
+                        Content="◀ Back"
+                        Classes="ghost"
+                        Click="Back_Click"
+                        Margin="0,0,16,0"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="KindText" Classes="label"/>
+                    <TextBlock x:Name="TitleText"
+                               FontFamily="{DynamicResource Font.Display}"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource Fg.Primary}"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Hero row — same pattern as Home (3 big tiles) -->
+            <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,12">
+
+                <Border Grid.Column="0" Classes="card hero-tile" Margin="0,0,8,0">
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Row="0" Classes="label" Text="K/D RATIO"/>
+                        <TextBlock Grid.Row="1" x:Name="HeroKdText"
+                                   Classes="stat-value" FontSize="36"
+                                   VerticalAlignment="Center" TextTrimming="None"/>
+                        <TextBlock Grid.Row="2" x:Name="HeroKdSubtext"
+                                   Classes="muted" FontSize="11"/>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Classes="card hero-tile" Margin="4,0,4,0">
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Row="0" Classes="label" Text="WIN RATE"/>
+                        <TextBlock Grid.Row="1" x:Name="HeroWinPctText"
+                                   Classes="stat-value good" FontSize="36"
+                                   VerticalAlignment="Center" TextTrimming="None"/>
+                        <TextBlock Grid.Row="2" x:Name="HeroWinPctSubtext"
+                                   Classes="muted" FontSize="11"/>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Classes="card hero-tile" Margin="8,0,0,0">
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Row="0" Classes="label" Text="MATCHES"/>
+                        <TextBlock Grid.Row="1" x:Name="HeroMatchesText"
+                                   Classes="stat-value" FontSize="36"
+                                   VerticalAlignment="Center" TextTrimming="None"/>
+                        <TextBlock Grid.Row="2" x:Name="HeroPlaytimeText"
+                                   Classes="muted" FontSize="11"/>
+                    </Grid>
+                </Border>
+
+            </Grid>
+
+            <!-- Stat strip -->
+            <Border Classes="card" Padding="20,14" Margin="0,0,0,16">
+                <Grid ColumnDefinitions="*,*,*,*,*,*">
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Classes="label" Text="WINS"/>
+                        <TextBlock x:Name="StripWinsText" Classes="strip-value good"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Classes="label" Text="LOSSES"/>
+                        <TextBlock x:Name="StripLossesText" Classes="strip-value danger"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Classes="label" Text="KILLS"/>
+                        <TextBlock x:Name="StripKillsText" Classes="strip-value"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Classes="label" Text="DEATHS"/>
+                        <TextBlock x:Name="StripDeathsText" Classes="strip-value"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Classes="label" Text="AVG DAMAGE"/>
+                        <TextBlock x:Name="StripAvgDmgText" Classes="strip-value"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="5">
+                        <TextBlock Classes="label" Text="AVG ACCURACY"/>
+                        <TextBlock x:Name="StripAvgAccText" Classes="strip-value"/>
+                    </StackPanel>
+
+                </Grid>
+            </Border>
+
+            <!-- Donut + best/worst panel -->
+            <Grid ColumnDefinitions="320,*" Margin="0,0,0,16">
+                <Border Grid.Column="0" Classes="card" Margin="0,0,8,0">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <ctl:DonutChart Grid.Column="0"
+                                        x:Name="WinDonut"
+                                        Width="140" Height="140"
+                                        VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Margin="20,0,0,0">
+                            <TextBlock Classes="label" Text="ON THIS"/>
+                            <TextBlock x:Name="DonutSubtitleText"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Fg.Primary}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,2,0,12"/>
+                            <TextBlock x:Name="StreakText"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Fg.Secondary}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Classes="card" Margin="8,0,0,0">
+                    <StackPanel>
+                        <TextBlock Classes="label" Text="BEST PERFORMANCE" Margin="0,0,0,8"/>
+                        <Grid Classes="stat-row" ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="Most kills" Foreground="{DynamicResource Fg.Secondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="BestKillsText" FontWeight="SemiBold" Foreground="{DynamicResource Fg.Primary}"/>
+                        </Grid>
+                        <Grid Classes="stat-row" ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="Most damage" Foreground="{DynamicResource Fg.Secondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="BestDmgText" FontWeight="SemiBold" Foreground="{DynamicResource Fg.Primary}"/>
+                        </Grid>
+                        <Grid Classes="stat-row" ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="Best K/D" Foreground="{DynamicResource Fg.Secondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="BestKdText" FontWeight="SemiBold" Foreground="{DynamicResource Fg.Primary}"/>
+                        </Grid>
+                        <Grid Classes="stat-row" ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="Highest accuracy" Foreground="{DynamicResource Fg.Secondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="BestAccText" FontWeight="SemiBold" Foreground="{DynamicResource Fg.Primary}"/>
+                        </Grid>
+                        <Grid Classes="stat-row" ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="Last played" Foreground="{DynamicResource Fg.Secondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="LastPlayedText" FontWeight="SemiBold" Foreground="{DynamicResource Fg.Primary}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Recent matches on this map/with this weapon -->
+            <Grid Margin="0,12,0,12" ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Classes="section-title" Text="MATCHES"/>
+                <TextBlock x:Name="MatchListSubtitle" Grid.Column="1" Classes="muted"
+                           VerticalAlignment="Bottom"/>
+            </Grid>
+
+            <ItemsControl x:Name="MatchList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -11,11 +11,20 @@
         ║ Stat-tile card (smaller, for big-number tiles):                    ║
         ║   <Border Classes="card stat-tile">…</Border>                      ║
         ║                                                                    ║
+        ║ Hero tile (extra-large headline stats — top of a page):            ║
+        ║   <Border Classes="card hero-tile">…</Border>                      ║
+        ║                                                                    ║
+        ║ Chart card (a card sized to host a graph):                         ║
+        ║   <Border Classes="card chart-card">…</Border>                     ║
+        ║                                                                    ║
+        ║ Stat list row (key-value row inside a card):                       ║
+        ║   <Grid Classes="stat-row">…</Grid>                                ║
+        ║                                                                    ║
         ║ Interactive card (Button styled as a card):                        ║
         ║   <Button Classes="card-button">…</Button>                         ║
         ║                                                                    ║
-        ║ Match card (extends card-button, has the win/loss bar slot):       ║
-        ║   <Button Classes="card-button match-card">…</Button>              ║
+        ║ Match card (extends card-button, has the win/loss bar slot):      ║
+        ║   <Button Classes="card-button match-card">…</Button>             ║
         ║                                                                    ║
         ║ Player row (for scoreboards):                                      ║
         ║   <Border Classes="player-row">…</Border>                          ║
@@ -35,6 +44,29 @@
         <Setter Property="Padding" Value="20,16"/>
         <Setter Property="MinWidth" Value="140"/>
         <Setter Property="MinHeight" Value="92"/>
+    </Style>
+
+    <!-- Hero tile: bigger, more padding, more presence. The page's
+         most important stats go in these. -->
+    <Style Selector="Border.hero-tile">
+        <Setter Property="Padding" Value="28,22"/>
+        <Setter Property="MinHeight" Value="130"/>
+        <Setter Property="Background" Value="{DynamicResource Bg.SurfaceRaised}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+    </Style>
+
+    <!-- Chart card: same as a card, but sized for a chart inside.
+         Set the chart Height to a fixed value; the card sizes around it. -->
+    <Style Selector="Border.chart-card">
+        <Setter Property="Padding" Value="20,18"/>
+        <Setter Property="MinHeight" Value="220"/>
+    </Style>
+
+    <!-- A row inside a card showing a key-value pair, used for compact
+         lists of stats inside a wide card.
+         Layout: <Grid Classes="stat-row" ColumnDefinitions="*,Auto"> -->
+    <Style Selector="Grid.stat-row">
+        <Setter Property="Margin" Value="0,4,0,4"/>
     </Style>
 
     <Style Selector="Border.player-row">

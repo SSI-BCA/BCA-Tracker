@@ -27,7 +27,18 @@ namespace BCATracker.UI.Services;
 public sealed class LiveMatchService : IDisposable
 {
     readonly CancellationTokenSource _cts = new();
+    readonly MatchUploadService? _uploader;
+    LobbyHostingService? _lobby;
     Task? _loopTask;
+
+    public LiveMatchService(MatchUploadService? uploader = null)
+    {
+        _uploader = uploader;
+    }
+
+    /// <summary>Wire the lobby orchestrator in so each snapshot can drive
+    /// host-side state. Called once during AppServices init.</summary>
+    public void AttachLobbyHosting(LobbyHostingService lobby) => _lobby = lobby;
 
     /// <summary>Fires whenever the reader produces a new snapshot. UI thread.</summary>
     public event Action<MatchSnapshot>? Tick;
@@ -76,7 +87,7 @@ public sealed class LiveMatchService : IDisposable
     {
         var reader   = new MemoryReader();
         var killFeed = new KillFeedTracker();
-        var saver    = new MatchSaver();
+        var saver    = new MatchSaver(_uploader);
         var timer    = new Stopwatch();
         byte lastState = 255;
         bool wasInMatch = false;
@@ -126,6 +137,25 @@ public sealed class LiveMatchService : IDisposable
                         DiagLog.SnapState(snap);
                         saver.Tick(snap);
                         Snapshot = snap;
+
+                        // Drive the lobby orchestrator. It decides on its
+                        // own whether to act based on settings + whether
+                        // we're hosting. Find the local player's display
+                        // name to use in the publish payload.
+                        try
+                        {
+                            string localName = "";
+                            if (snap.Players is not null)
+                                foreach (var p in snap.Players)
+                                    if (p.IsLocal) { localName = p.Name ?? ""; break; }
+                            _lobby?.OnSnapshot(snap.Lobby, localName,
+                                               inMatch: snap.InMatch,
+                                               isMainMenu: snap.IsMainMenu);
+                        }
+                        catch (Exception lex)
+                        {
+                            DiagLog.Exception("LobbyHosting.OnSnapshot", lex);
+                        }
 
                         bool nowInMatch = snap.InMatch;
                         bool justStarted = !wasInMatch && nowInMatch;

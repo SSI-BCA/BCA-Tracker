@@ -10,11 +10,12 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>AnyCPU;x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 
     <!-- Versioning. Bump VersionPrefix on releases; VersionSuffix marks
-         the build channel. Keep this in sync with the alpha numbering. -->
-    <VersionPrefix>0.14.0</VersionPrefix>
+         the build channel. -->
+    <VersionPrefix>0.15.0</VersionPrefix>
     <VersionSuffix>beta1</VersionSuffix>
   </PropertyGroup>
 
@@ -23,31 +24,10 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.0.2" />
     <PackageReference Include="Avalonia.Themes.Simple" Version="12.0.2" />
     <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
-    <!-- Avalonia.Diagnostics was previously listed here for runtime DevTools
-         (F12 in Debug builds). It hasn't shipped a 12.x build yet — only
-         11.3.x is on NuGet. Re-add when 12.x lands:
-           <PackageReference Condition="'$(Configuration)' == 'Debug'"
-                             Include="Avalonia.Diagnostics" Version="12.0.x" /> -->
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BCA-Tracker.Core\BCA-Tracker.Core.csproj" />
-
-    <!--
-      Legacy exe is referenced as a build dependency only (not a code
-      reference). The OutputItemType=Content + ReferenceOutputAssembly=false
-      pair causes MSBuild to:
-        1. build BCA-Tracker.Legacy whenever we build BCA-Tracker, AND
-        2. copy the Legacy exe + dlls into our own output folder, AND
-        3. NOT pull Legacy types into our compile.
-
-      So at runtime, AppPaths.LegacyExePath finds it as a sibling exe.
-    -->
-    <ProjectReference Include="..\BCA-Tracker.Legacy\BCA-Tracker.Legacy.csproj"
-                      ReferenceOutputAssembly="false"
-                      OutputItemType="Content"
-                      CopyToOutputDirectory="PreserveNewest"
-                      Private="false"/>
   </ItemGroup>
 
 </Project>

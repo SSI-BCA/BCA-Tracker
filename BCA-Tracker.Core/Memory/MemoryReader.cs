@@ -57,6 +57,11 @@ namespace BCATracker.Core
 
         // ── Snapshot ──────────────────────────────────────────────────────────
 
+        long _lastMemGworld = -1;
+        long _lastMemGameState = -1;
+        long _lastMemMyPS = -1;
+        string _lastLobbyReadLine = "";
+
         public MatchSnapshot ReadSnapshot(KillFeedTracker killFeed,
                                           System.Diagnostics.Stopwatch matchTimer,
                                           ref byte lastState,
@@ -71,7 +76,15 @@ namespace BCATracker.Core
             long gameState = gworld != 0 ? ReadLong(gworld + Offsets.World_GameState) : 0;
             long myStatePtr = ResolveLocalPlayerStatePtr();
 
-            DiagLog.Write($"[Mem] gworld=0x{gworld:X} gameState=0x{gameState:X} myPS=0x{myStatePtr:X}");
+            // Only log when one of the three pointers changes — it's
+            // otherwise the same line every 500ms.
+            if (gworld != _lastMemGworld || gameState != _lastMemGameState || myStatePtr != _lastMemMyPS)
+            {
+                DiagLog.Write($"[Mem] gworld=0x{gworld:X} gameState=0x{gameState:X} myPS=0x{myStatePtr:X}");
+                _lastMemGworld = gworld;
+                _lastMemGameState = gameState;
+                _lastMemMyPS = myStatePtr;
+            }
 
             if (gameState == 0)
             {
@@ -186,7 +199,7 @@ namespace BCATracker.Core
             if (isCustomGS)
             {
                 snap.IsLobby = true;
-                snap.Lobby = ReadLobbyData(gameState, nameResolver);
+                snap.Lobby = ReadLobbyData(gameState, myStatePtr, nameResolver);
                 snap.UpdatedAt = DateTime.Now;
                 return snap;
             }
@@ -458,7 +471,7 @@ namespace BCATracker.Core
             return p;
         }
 
-        LobbyData ReadLobbyData(long gs, FNameResolver resolver)
+        LobbyData ReadLobbyData(long gs, long myPS, FNameResolver resolver)
         {
             var d = new LobbyData();
             int arenaIdx = ReadInt(gs + Offsets.CGS_ArenaRowName);
@@ -468,8 +481,132 @@ namespace BCATracker.Core
             d.MapName = ResolveMapName(arenaIdx, resolver);
             d.ModeName = ResolveModeName(modeIdx, resolver);
 
+            // ── Lobby browser additions ──────────────────────────────────────
+            // Fields below populate the lobby-publishing payload. We read
+            // them defensively: any failure leaves the field at default
+            // and the rest of the snapshot is unaffected.
+
+            d.MaxTeamSize        = ReadInt(gs + Offsets.CGS_MaxTeamSize);
+            d.CurrentPlayerCount = ReadInt(gs + Offsets.CGS_ConnectedPlayersArr_Count);
+            // Sanity clamp — if memory is unstable we sometimes see absurd
+            // values; cap at 32 so the publisher doesn't ship garbage.
+            if (d.CurrentPlayerCount < 0 || d.CurrentPlayerCount > 32) d.CurrentPlayerCount = 0;
+            if (d.MaxTeamSize < 0 || d.MaxTeamSize > 32) d.MaxTeamSize = 0;
+
+            // Password is stored as an FGuid; zero-GUID means no password.
+            d.HasPassword = !IsZeroFGuid(gs + Offsets.CGS_LobbyPassword);
+
+            // The local player's IsGameLeader and CustomProfileID live on
+            // the local PlayerController's PlayerState, which is a
+            // CustomGamePS_C while we're in a lobby. The snapshot reader
+            // already resolved this pointer (myPS) — we just use it.
+            long localPS = myPS;
+            try
+            {
+                if (localPS != 0)
+                {
+                    d.LocalPlayerIsHost     = ReadByte(localPS + Offsets.CPS_IsGameLeader) != 0;
+                    d.LocalPlayerProfileId  = ReadFGuidHex(localPS + Offsets.CPS_CustomProfileID);
+                    d.LocalPlayerName       = ReadFString(localPS + Offsets.APS_PlayerNamePrivate, 64);
+                }
+            }
+            catch
+            {
+                // best-effort — leave defaults
+            }
+
+            // Walk ConnectedPlayerStates array (TArray<APlayerState*>). We
+            // read up to CurrentPlayerCount entries, decoding each into a
+            // light LobbyPlayer record.
+            try
+            {
+                long arrData  = ReadLong(gs + Offsets.CGS_ConnectedPlayersArr_Data);
+                int  arrCount = d.CurrentPlayerCount;
+                if (arrData != 0 && arrCount > 0)
+                {
+                    var sb = new StringBuilder();
+                    for (int i = 0; i < arrCount && i < 16; i++)
+                    {
+                        long ps = ReadLong(arrData + i * 8L);
+                        if (ps == 0) continue;
+                        byte botByte = ReadByte(ps + Offsets.APS_bIsABot_Byte);
+                        var lp = new LobbyPlayer
+                        {
+                            Name        = ReadFString(ps + Offsets.APS_PlayerNamePrivate, 64),
+                            Team        = ReadInt(ps + Offsets.CPS_Team),
+                            IsHost      = ReadByte(ps + Offsets.CPS_IsGameLeader) != 0,
+                            IsBot       = (botByte & 0x08) != 0, // bit 3 — bIsABot
+                            ProfileId   = ReadFGuidHex(ps + Offsets.CPS_CustomProfileID),
+                        };
+                        d.Players.Add(lp);
+                        sb.Append($"  [{i}] name='{lp.Name}' team={lp.Team} " +
+                                  $"isHost={lp.IsHost} isBot={lp.IsBot} " +
+                                  $"pid={Truncate(lp.ProfileId, 8)} ps=0x{ps:X}\n");
+
+                        // If the walked entry matches our local PS pointer,
+                        // it's us — use this as authoritative name + host
+                        // status. Catches the case where the LocalPCSlot
+                        // path reads stale or wrong state.
+                        if (ps == localPS)
+                        {
+                            if (!string.IsNullOrEmpty(lp.Name))
+                                d.LocalPlayerName = lp.Name;
+                            d.LocalPlayerIsHost = lp.IsHost;
+                        }
+                    }
+                    string composed = $"[LobbyRead] arrData=0x{arrData:X} count={arrCount} localPS=0x{localPS:X}\n{sb}";
+                    // Only emit when the payload changed — every-tick
+                    // identical dumps were drowning the log.
+                    if (composed != _lastLobbyReadLine)
+                    {
+                        DiagLog.Write(composed);
+                        _lastLobbyReadLine = composed;
+                    }
+                }
+                else
+                {
+                    DiagLog.Write($"[LobbyRead] empty player array (data=0x{arrData:X} count={arrCount})");
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[LobbyRead] player walk failed: {ex.Message}");
+            }
+
             DiagLog.LobbyRead(d.MapName, d.ModeName, d.BotCountT1, d.BotCountT2, arenaIdx, modeIdx);
             return d;
+        }
+
+        static string Truncate(string s, int n) =>
+            string.IsNullOrEmpty(s) ? "" : (s.Length <= n ? s : s.Substring(0, n));
+
+        /// <summary>
+        /// True if all 16 bytes at <paramref name="addr"/> are zero. UE's
+        /// FGuid is four uint32s laid out contiguously, so this is a
+        /// straight memcmp.
+        /// </summary>
+        bool IsZeroFGuid(long addr)
+        {
+            var buf = new byte[16];
+            if (!ReadRaw(addr, buf, 16)) return true;   // unreadable → treat as zero
+            for (int i = 0; i < 16; i++)
+                if (buf[i] != 0) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// Reads an FGuid (16 bytes) and returns it as a 32-character
+        /// lowercase hex string with no separators. Returns "" if the
+        /// read failed.
+        /// </summary>
+        string ReadFGuidHex(long addr)
+        {
+            var buf = new byte[16];
+            if (!ReadRaw(addr, buf, 16)) return "";
+            var sb = new StringBuilder(32);
+            for (int i = 0; i < 16; i++)
+                sb.Append(buf[i].ToString("x2"));
+            return sb.ToString();
         }
 
         // ── Primitives ────────────────────────────────────────────────────────

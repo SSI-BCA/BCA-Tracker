@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="BCATracker.UI.Views.DataSubmissionConsentDialog"
+        Title="Help improve BCA-Tracker"
+        Width="560" Height="460"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False">
+
+    <Border Background="{DynamicResource Bg.Surface}" Padding="24">
+        <Grid RowDefinitions="Auto,*,Auto">
+
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                <TextBlock Text="Help improve BCA-Tracker?"
+                           FontSize="20" FontWeight="Bold"
+                           Foreground="{DynamicResource Fg.Primary}"
+                           Margin="0,0,0,4"/>
+                <TextBlock Text="One-time question — you can change this any time in Settings."
+                           Foreground="{DynamicResource Fg.Muted}"/>
+            </StackPanel>
+
+            <!-- Body -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               Margin="0,0,0,12"
+                               Text="BCA-Tracker can optionally upload your finished match files to a community server. The data is used to power features like map and weapon pickrate stats and a list of currently-running matches."/>
+
+                    <TextBlock Text="What gets uploaded"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource Fg.Primary}"
+                               Margin="0,8,0,4"/>
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               Margin="0,0,0,8"
+                               Text="• Match results — scoreboard, kill feed, per-player loadouts, stat counters"/>
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               Margin="0,0,0,8"
+                               Text="• Map and game mode"/>
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               Margin="0,0,0,8"
+                               Text="• An anonymous installation ID so we can group your matches together for &quot;your history&quot; features (this ID can be rotated in Settings to start fresh)"/>
+
+                    <TextBlock Text="What does NOT get uploaded"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource Fg.Primary}"
+                               Margin="0,12,0,4"/>
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               Margin="0,0,0,8"
+                               Text="• Your Steam/Epic account ID, IP address, or Windows username"/>
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource Fg.Secondary}"
+                               Margin="0,0,0,8"
+                               Text="• Anything from outside Battle Core Arena"/>
+
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource Fg.Muted}"
+                               FontSize="11"
+                               Margin="0,16,0,0"
+                               Text="Uploads only happen when both this option is enabled AND a server endpoint is configured. The default build ships with no endpoint, so even if you say yes here, no data is sent until an endpoint is set in Settings."/>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Footer buttons -->
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" Margin="0,16,0,0">
+                <TextBlock Grid.Column="0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Fg.Muted}"
+                           FontSize="11"
+                           Text="You can change this any time in Settings → Data submission."/>
+                <Button Grid.Column="1" Content="No thanks"
+                        Margin="0,0,8,0"
+                        Click="DeclineButton_Click"/>
+                <Button Grid.Column="2" Content="Yes, share my matches"
+                        Classes="primary"
+                        Click="AcceptButton_Click"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

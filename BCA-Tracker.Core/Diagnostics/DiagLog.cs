@@ -65,8 +65,25 @@ namespace BCATracker.Core
 
         // ── Lobby ─────────────────────────────────────────────────────────────
 
-        public static void LobbyRead(string map, string mode, int botsT1, int botsT2, int arenaFNameIdx, int modeFNameIdx) =>
+        static string _lastLobbyMap = "\0";
+        static string _lastLobbyMode = "\0";
+        static int _lastLobbyBotsT1 = -1;
+        static int _lastLobbyBotsT2 = -1;
+
+        public static void LobbyRead(string map, string mode, int botsT1, int botsT2, int arenaFNameIdx, int modeFNameIdx)
+        {
+            // Suppress identical repeats — the lobby is polled every
+            // ~500ms but rarely changes. Indices and counts together form
+            // the dedup key.
+            if (map == _lastLobbyMap && mode == _lastLobbyMode
+                && botsT1 == _lastLobbyBotsT1 && botsT2 == _lastLobbyBotsT2)
+                return;
+            _lastLobbyMap = map;
+            _lastLobbyMode = mode;
+            _lastLobbyBotsT1 = botsT1;
+            _lastLobbyBotsT2 = botsT2;
             Write($"[Lobby] map=\"{map}\" mode=\"{mode}\" botsT1={botsT1} botsT2={botsT2} arenaIdx=0x{arenaFNameIdx:X} modeIdx=0x{modeFNameIdx:X}");
+        }
 
         public static void LobbyCached(string map, string mode) =>
             Write($"[Lobby] Cached — map=\"{map}\" mode=\"{mode}\"");
@@ -133,12 +150,38 @@ namespace BCATracker.Core
             Write($"[Save] Skipped — {reason}");
 
         // ── FName ─────────────────────────────────────────────────────────────
+        //
+        // Suppress identical "resolved" lines — each kind ("Map", "Mode")
+        // resolves the same idx every tick once the lobby's stable, so we
+        // log only when the resolution actually changes.
 
-        public static void FNameResolved(string kind, int idx, string raw, string display) =>
+        static readonly System.Collections.Generic.Dictionary<string, (int idx, string display)> _lastFName
+            = new System.Collections.Generic.Dictionary<string, (int, string)>();
+
+        public static void FNameResolved(string kind, int idx, string raw, string display)
+        {
+            lock (_lock)
+            {
+                if (_lastFName.TryGetValue(kind, out var prev)
+                    && prev.idx == idx && prev.display == display)
+                    return;
+                _lastFName[kind] = (idx, display);
+            }
             Write($"[FName] {kind} idx=0x{idx:X} raw=\"{raw}\" → \"{display}\"");
+        }
 
-        public static void FNameUnmatched(string kind, int idx, string raw) =>
+        public static void FNameUnmatched(string kind, int idx, string raw)
+        {
+            // Same dedup; treat "unmatched" as a distinct display value.
+            lock (_lock)
+            {
+                if (_lastFName.TryGetValue(kind, out var prev)
+                    && prev.idx == idx && prev.display == "<unmatched>")
+                    return;
+                _lastFName[kind] = (idx, "<unmatched>");
+            }
             Write($"[FName] {kind} idx=0x{idx:X} raw=\"{raw}\" — no display name match");
+        }
 
         // ── Exceptions ────────────────────────────────────────────────────────
 

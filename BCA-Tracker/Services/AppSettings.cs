@@ -5,6 +5,10 @@ using System.Text.Json.Serialization;
 
 namespace BCATracker.UI.Services;
 
+/// <summary>
+/// Kept around so existing settings.json files don't fail to deserialize.
+/// As of beta2 we ship only the modern UI; this enum has no effect.
+/// </summary>
 public enum UIChoice
 {
     None    = 0,
@@ -19,19 +23,24 @@ public enum UIChoice
 /// </summary>
 public class AppSettings
 {
-    /// <summary>Last choice made in the launcher dialog (Modern or Legacy).</summary>
+    // ── Legacy launcher fields (unused after beta2) ──────────────────────────
+    // These are still serialized so older settings.json files round-trip
+    // cleanly and so users who flip back to an older build don't lose data.
+
     [JsonPropertyName("preferredUI")]
     public UIChoice PreferredUI { get; set; } = UIChoice.Modern;
 
-    /// <summary>If true, skip the launcher dialog on subsequent starts and
-    /// go directly to <see cref="PreferredUI"/>.</summary>
     [JsonPropertyName("rememberLauncherChoice")]
-    public bool RememberLauncherChoice { get; set; } = false;
+    public bool RememberLauncherChoice { get; set; } = true;
+
+    // ── Paths ────────────────────────────────────────────────────────────────
 
     /// <summary>Folder that match JSON files are read from. Defaults to the
     /// same folder the legacy tracker writes to.</summary>
     [JsonPropertyName("matchesFolder")]
     public string? MatchesFolder { get; set; }
+
+    // ── Discord RPC ──────────────────────────────────────────────────────────
 
     /// <summary>Whether to push Discord Rich Presence updates while the app
     /// is running. Off by default; flip on in Settings.</summary>
@@ -44,11 +53,93 @@ public class AppSettings
     [JsonPropertyName("discordClientId")]
     public string DiscordClientId { get; set; } = "";
 
+    // ── Profile ──────────────────────────────────────────────────────────────
+
     /// <summary>Optional path to an image file used as the profile picture
     /// on the Home page identity card. If null/empty or the file is missing,
     /// the avatar falls back to the first letter of the player's handle.</summary>
     [JsonPropertyName("profilePicturePath")]
     public string? ProfilePicturePath { get; set; }
+
+    // ── Anonymous match data submission ──────────────────────────────────────
+    //
+    // The tracker can optionally upload completed match files to a backend
+    // server for community-wide stats (map/weapon pickrates, currently-
+    // running matches, leaderboards). This is OPT-IN — defaults to off,
+    // user is asked on first run.
+    //
+    // What gets uploaded: the raw match_*.json files we already write to
+    // disk. They contain player handles, loadouts, kill feed entries,
+    // and stat counters — same info anyone watching the kill feed in-game
+    // would see. They do NOT contain Steam/Epic IDs, IP addresses, or
+    // the user's Windows account name.
+    //
+    // The AnonymousAccountId GUID lets the backend group a single user's
+    // matches together for "your history" features without learning who
+    // the user is. Generated once on first launch, never leaves this
+    // machine if data submission is off.
+
+    /// <summary>Set to true once the user has been shown the data-submission
+    /// consent dialog. Until then, the dialog appears at startup. Independent
+    /// of the answer the user gave (their answer goes in
+    /// <see cref="DataSubmissionEnabled"/>).</summary>
+    [JsonPropertyName("dataSubmissionAsked")]
+    public bool DataSubmissionAsked { get; set; } = false;
+
+    /// <summary>If true, finished match JSON files are queued for upload to
+    /// <see cref="DataSubmissionEndpoint"/>. Off by default.</summary>
+    [JsonPropertyName("dataSubmissionEnabled")]
+    public bool DataSubmissionEnabled { get; set; } = false;
+
+    /// <summary>Base URL of the upload backend. Empty/null means the feature
+    /// is dormant even if <see cref="DataSubmissionEnabled"/> is true (so
+    /// builds without a configured backend can ship safely). The uploader
+    /// POSTs to {endpoint}/v1/matches.</summary>
+    [JsonPropertyName("dataSubmissionEndpoint")]
+    public string DataSubmissionEndpoint { get; set; } = "";
+
+    /// <summary>Stable random GUID generated on first launch. Identifies the
+    /// installation to the backend without revealing the underlying account.
+    /// The user can rotate this from Settings to start a fresh stats history.
+    /// </summary>
+    [JsonPropertyName("anonymousAccountId")]
+    public string AnonymousAccountId { get; set; } = "";
+
+    // ── Lobby advertising ────────────────────────────────────────────────────
+    //
+    // When the user hosts a custom BCA lobby and toggles this on, the
+    // tracker asks the backend to provision a NetBird group + setup key
+    // for it, enrolls the local NetBird agent into that group, and
+    // posts the lobby (with the host's NetBird IP) to the directory
+    // backend. Other tracker users see it in the Lobbies tab, click
+    // join, and their NetBird agent enrolls into the same group — at
+    // which point both peers are on the same encrypted overlay
+    // network and BCA's direct-connect "just works" over the NetBird IP.
+    //
+    // The "advertised name" is what shows up in the browser. It's
+    // tracker-side because reading the in-game lobby name (UE FText) is
+    // brittle across versions.
+
+    /// <summary>Master toggle for lobby advertising. Off by default.</summary>
+    [JsonPropertyName("lobbyAdvertisingEnabled")]
+    public bool LobbyAdvertisingEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Override the automatic "am I the host?" memory read. Until the
+    /// IsGameLeader offset is verified across game builds, this lets
+    /// users manually claim host status — useful for testing, and for
+    /// patches where the offset shifts. When false, hosting is gated on
+    /// the memory-read result.
+    /// </summary>
+    [JsonPropertyName("lobbyForceHost")]
+    public bool LobbyForceHost { get; set; } = false;
+
+    /// <summary>What the lobby is called in the browser. Empty falls back
+    /// to "{hostName}'s lobby".</summary>
+    [JsonPropertyName("lobbyAdvertisedName")]
+    public string LobbyAdvertisedName { get; set; } = "";
+
+    // ── Persistence ──────────────────────────────────────────────────────────
 
     static readonly JsonSerializerOptions s_jsonOpts = new()
     {
@@ -58,21 +149,38 @@ public class AppSettings
 
     public static AppSettings Load()
     {
+        AppSettings settings;
         try
         {
             string path = AppPaths.SettingsFilePath;
-            if (!File.Exists(path)) return new AppSettings();
-
-            string json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<AppSettings>(json, s_jsonOpts) ?? new AppSettings();
+            if (!File.Exists(path))
+            {
+                settings = new AppSettings();
+            }
+            else
+            {
+                string json = File.ReadAllText(path);
+                settings = JsonSerializer.Deserialize<AppSettings>(json, s_jsonOpts)
+                           ?? new AppSettings();
+            }
         }
         catch
         {
-            // Corrupt or unreadable settings file — fall back to defaults.
-            // We deliberately don't surface this to the user; the launcher will
-            // show on next start and they can re-pick.
-            return new AppSettings();
+            // Corrupt or unreadable — fall back to defaults.
+            settings = new AppSettings();
         }
+
+        // Backfill the anonymous ID for installations that pre-date this
+        // field. We do this even if data submission isn't enabled, so the
+        // ID is stable from the very first launch onward — toggling
+        // submission on later won't reset the user's history.
+        if (string.IsNullOrEmpty(settings.AnonymousAccountId))
+        {
+            settings.AnonymousAccountId = Guid.NewGuid().ToString("N");
+            settings.Save();
+        }
+
+        return settings;
     }
 
     public void Save()
@@ -86,8 +194,7 @@ public class AppSettings
         }
         catch
         {
-            // Settings persistence is best-effort. Failure here is not worth
-            // interrupting the user — they'll just see the launcher again.
+            // Settings persistence is best-effort.
         }
     }
 }

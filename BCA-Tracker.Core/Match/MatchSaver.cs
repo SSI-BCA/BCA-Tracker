@@ -15,6 +15,7 @@ namespace BCATracker.Core
         };
 
         readonly string _saveDir;
+        readonly MatchUploadService? _uploader;
 
         bool _wasPostMatch = false;
         MatchSnapshot _lastPostMatchSnap = null;
@@ -25,14 +26,24 @@ namespace BCATracker.Core
         string _lobbyMapName = null;
         string _lobbyModeName = null;
 
-        public MatchSaver()
+        public MatchSaver() : this(uploader: null) { }
+
+        /// <summary>
+        /// Construct with an optional uploader. When non-null, every match
+        /// successfully saved to disk also gets enqueued for upload (the
+        /// uploader itself decides whether to actually send anything based
+        /// on its own enabled/endpoint configuration).
+        /// </summary>
+        public MatchSaver(MatchUploadService? uploader)
         {
+            _uploader = uploader;
             string hub = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "BCA-Tracker");
             _saveDir = Path.Combine(hub, "matches");
             Directory.CreateDirectory(_saveDir);
-            DiagLog.Write($"[Saver] Started — saveDir={_saveDir}");
+            DiagLog.Write($"[Saver] Started — saveDir={_saveDir}" +
+                          (_uploader != null ? " (uploader attached)" : ""));
         }
 
         public void Tick(MatchSnapshot snap)
@@ -152,6 +163,11 @@ namespace BCATracker.Core
 
                 DiagLog.SaveOk(path);
                 Console.WriteLine($"  [Saved] {path}");
+
+                // Hand the saved match to the uploader. This is a no-op
+                // when uploads aren't configured/enabled, so it's safe to
+                // call unconditionally.
+                _uploader?.Enqueue(path);
 
                 // Reset cache so the next match doesn't inherit this map
                 _lobbyMapName = null;

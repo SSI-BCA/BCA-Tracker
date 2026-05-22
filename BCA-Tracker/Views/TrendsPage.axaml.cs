@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System;
 using System.Globalization;
 using System.Linq;
 using Avalonia;
@@ -15,6 +15,18 @@ public partial class TrendsPage : UserControl
     /// <summary>0 = all, otherwise count of trailing matches.</summary>
     int _rangeLimit = 25;
 
+    /// <summary>Which metric is shown in the big featured chart at the top.</summary>
+    string _featuredMetric = "kd";
+
+    // Cached series for the current window — recomputed in Refresh and reused
+    // when only the featured-metric selection changes.
+    double[] _kd = Array.Empty<double>();
+    double[] _acc = Array.Empty<double>();
+    double[] _dmg = Array.Empty<double>();
+    double[] _winRate = Array.Empty<double>();
+    double[] _delta = Array.Empty<double>();
+    double[] _alive = Array.Empty<double>();
+
     public TrendsPage()
     {
         InitializeComponent();
@@ -30,13 +42,21 @@ public partial class TrendsPage : UserControl
         }
     }
 
+    void Metric_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is string tag)
+        {
+            _featuredMetric = tag;
+            UpdateFeaturedChart();
+            UpdateMetricButtonStyles();
+        }
+    }
+
     void Refresh()
     {
         var matches = AppServices.Matches.LoadAll();
         string? knownAccountId = Stats.FindKnownAccountId(matches);
 
-        // Oldest → newest within the selected window. Take the most recent
-        // _rangeLimit matches (or all if 0), then re-sort chronologically.
         var ordered = matches.OrderBy(m => m.PlayedAt).ToList();
         var window  = _rangeLimit > 0 && ordered.Count > _rangeLimit
             ? ordered.Skip(ordered.Count - _rangeLimit).ToList()
@@ -60,8 +80,11 @@ public partial class TrendsPage : UserControl
         if (rows.Count == 0)
         {
             SubtitleText.Text = "No matches saved yet.";
-            WinPctTotal.Text = AvgKdTotal.Text = AvgDmgTotal.Text = MatchCountTotal.Text = "—";
-            ClearAllCharts();
+            WinPctTotal.Text = AvgKdTotal.Text = AvgDmgTotal.Text = MatchCountTotal.Text = AvgAccTotal.Text = "—";
+            _kd = _acc = _dmg = _winRate = _delta = _alive = Array.Empty<double>();
+            UpdateFeaturedChart();
+            UpdateMiniCharts();
+            UpdateMetricButtonStyles();
             return;
         }
 
@@ -70,20 +93,20 @@ public partial class TrendsPage : UserControl
             : $"Last {rows.Count} match" + (rows.Count == 1 ? "" : "es") + " — oldest on the left.";
 
         // Per-match series
-        double[] kd = rows.Select(r =>
+        _kd = rows.Select(r =>
             r.Me!.Deaths > 0 ? (double)r.Me.Kills / r.Me.Deaths : (double)r.Me.Kills
         ).ToArray();
-        double[] acc       = rows.Select(r => (double)r.Me!.Accuracy).ToArray();
-        double[] dmg       = rows.Select(r => r.Me!.Damage).ToArray();
-        double[] delta     = rows.Select(r => r.Me!.Damage - r.Me.ReceivedShieldDmg).ToArray();
-        double[] timeAlive = rows.Select(r => r.Me!.TimeAliveSecs).ToArray();
+        _acc   = rows.Select(r => (double)r.Me!.Accuracy).ToArray();
+        _dmg   = rows.Select(r => r.Me!.Damage).ToArray();
+        _delta = rows.Select(r => r.Me!.Damage - r.Me.ReceivedShieldDmg).ToArray();
+        _alive = rows.Select(r => r.Me!.TimeAliveSecs).ToArray();
 
         // Rolling 10-match win rate.
-        double[] winRate = new double[rows.Count];
-        const int Window = 10;
+        _winRate = new double[rows.Count];
+        const int RollingWindow = 10;
         for (int i = 0; i < rows.Count; i++)
         {
-            int start = System.Math.Max(0, i - Window + 1);
+            int start = Math.Max(0, i - RollingWindow + 1);
             int wins = 0, total = 0;
             for (int j = start; j <= i; j++)
             {
@@ -91,7 +114,7 @@ public partial class TrendsPage : UserControl
                 if (w == true) { wins++; total++; }
                 else if (w == false) total++;
             }
-            winRate[i] = total > 0 ? 100.0 * wins / total : 0;
+            _winRate[i] = total > 0 ? 100.0 * wins / total : 0;
         }
 
         // Summary stats over the window
@@ -103,43 +126,101 @@ public partial class TrendsPage : UserControl
             else if (w == false) totalDecided++;
         }
         double winPct = totalDecided > 0 ? 100.0 * totalWins / totalDecided : 0;
-        double avgKd  = kd.Length > 0 ? kd.Average() : 0;
-        double avgDmg = dmg.Length > 0 ? dmg.Average() : 0;
+        double avgKd  = _kd.Length  > 0 ? _kd.Average()  : 0;
+        double avgDmg = _dmg.Length > 0 ? _dmg.Average() : 0;
+        double avgAcc = _acc.Length > 0 ? _acc.Average() : 0;
 
+        MatchCountTotal.Text = rows.Count.ToString();
         WinPctTotal.Text     = winPct.ToString("0.0", CultureInfo.InvariantCulture) + "%";
         AvgKdTotal.Text      = avgKd .ToString("0.00", CultureInfo.InvariantCulture);
         AvgDmgTotal.Text     = ((int)avgDmg).ToString();
-        MatchCountTotal.Text = rows.Count.ToString();
+        AvgAccTotal.Text     = avgAcc.ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
+        UpdateFeaturedChart();
+        UpdateMiniCharts();
+        UpdateMetricButtonStyles();
+    }
+
+    /// <summary>
+    /// Repaint the big featured chart based on which metric is selected.
+    /// Called both on Refresh (after data update) and on Metric_Click
+    /// (when only the selection changes).
+    /// </summary>
+    void UpdateFeaturedChart()
+    {
         IBrush accent = LookupBrush("Accent",   Brushes.MediumPurple);
         IBrush good   = LookupBrush("Good",     Brushes.MediumSeaGreen);
         IBrush danger = LookupBrush("Danger",   Brushes.IndianRed);
         IBrush teamA  = LookupBrush("Team.A",   Brushes.SteelBlue);
         IBrush muted  = LookupBrush("Fg.Muted", Brushes.Gray);
 
-        IBrush accentFill = TranslucentVariant(accent);
-        IBrush goodFill   = TranslucentVariant(good);
-        IBrush dangerFill = TranslucentVariant(danger);
-        IBrush teamAFill  = TranslucentVariant(teamA);
-        IBrush mutedFill  = TranslucentVariant(muted);
-
-        KdChart.SetData       (kd,        "0.00",          lineColor: accent, fillColor: accentFill);
-        AccChart.SetData      (acc,       "0",  suffix: "%", lineColor: good,   fillColor: goodFill);
-        DmgChart.SetData      (dmg,       "#,0",           lineColor: danger, fillColor: dangerFill);
-        WinRateChart.SetData  (winRate,   "0",  suffix: "%", lineColor: good,   fillColor: goodFill);
-        DeltaChart.SetData    (delta,     "#,0",           lineColor: teamA,  fillColor: teamAFill);
-        TimeAliveChart.SetData(timeAlive, "0",  suffix: "s", lineColor: muted,  fillColor: mutedFill);
+        switch (_featuredMetric)
+        {
+            case "kd":
+                FeaturedChartTitle.Text = "K/D RATIO PER MATCH";
+                FeaturedChart.HigherIsBetter = true;
+                FeaturedChart.SetData(_kd, "0.00", lineColor: accent, fillColor: Translucent(accent));
+                break;
+            case "acc":
+                FeaturedChartTitle.Text = "WEAPON ACCURACY (%)";
+                FeaturedChart.HigherIsBetter = true;
+                FeaturedChart.SetData(_acc, "0", suffix: "%", lineColor: good, fillColor: Translucent(good));
+                break;
+            case "dmg":
+                FeaturedChartTitle.Text = "DAMAGE PER MATCH";
+                FeaturedChart.HigherIsBetter = true;
+                FeaturedChart.SetData(_dmg, "#,0", lineColor: danger, fillColor: Translucent(danger));
+                break;
+            case "winrate":
+                FeaturedChartTitle.Text = "WIN RATE — 10-MATCH ROLLING (%)";
+                FeaturedChart.HigherIsBetter = true;
+                FeaturedChart.SetData(_winRate, "0", suffix: "%", lineColor: good, fillColor: Translucent(good));
+                break;
+            case "delta":
+                FeaturedChartTitle.Text = "DAMAGE DELTA (DEALT − TAKEN)";
+                FeaturedChart.HigherIsBetter = true;
+                FeaturedChart.SetData(_delta, "#,0", lineColor: teamA, fillColor: Translucent(teamA));
+                break;
+            case "alive":
+                FeaturedChartTitle.Text = "TIME ALIVE PER MATCH (SECONDS)";
+                FeaturedChart.HigherIsBetter = true;  // longer = better in this game
+                FeaturedChart.SetData(_alive, "0", suffix: "s", lineColor: muted, fillColor: Translucent(muted));
+                break;
+        }
     }
 
-    void ClearAllCharts()
+    /// <summary>
+    /// Repaint the three small overview charts. These always show the same
+    /// metrics regardless of which is in the featured slot — the idea is the
+    /// user can scan the small ones and click into whichever looks
+    /// interesting (future enhancement: make them clickable to swap).
+    /// </summary>
+    void UpdateMiniCharts()
     {
-        var empty = System.Array.Empty<double>();
-        KdChart.SetData(empty);
-        AccChart.SetData(empty);
-        DmgChart.SetData(empty);
-        WinRateChart.SetData(empty);
-        DeltaChart.SetData(empty);
-        TimeAliveChart.SetData(empty);
+        IBrush accent = LookupBrush("Accent",   Brushes.MediumPurple);
+        IBrush good   = LookupBrush("Good",     Brushes.MediumSeaGreen);
+        IBrush danger = LookupBrush("Danger",   Brushes.IndianRed);
+
+        MiniAccChart.HigherIsBetter = true;
+        MiniAccChart.SetData(_acc, "0", suffix: "%", lineColor: good, fillColor: Translucent(good));
+
+        MiniDmgChart.HigherIsBetter = true;
+        MiniDmgChart.SetData(_dmg, "#,0", lineColor: danger, fillColor: Translucent(danger));
+
+        MiniWinRateChart.HigherIsBetter = true;
+        MiniWinRateChart.SetData(_winRate, "0", suffix: "%", lineColor: accent, fillColor: Translucent(accent));
+    }
+
+    void UpdateMetricButtonStyles()
+    {
+        // The active metric pill loses its "ghost" class so the styling
+        // file can render it filled. All others get "ghost".
+        MetricKdBtn.Classes.Set("ghost",      _featuredMetric != "kd");
+        MetricAccBtn.Classes.Set("ghost",     _featuredMetric != "acc");
+        MetricDmgBtn.Classes.Set("ghost",     _featuredMetric != "dmg");
+        MetricWinRateBtn.Classes.Set("ghost", _featuredMetric != "winrate");
+        MetricDeltaBtn.Classes.Set("ghost",   _featuredMetric != "delta");
+        MetricAliveBtn.Classes.Set("ghost",   _featuredMetric != "alive");
     }
 
     static IBrush LookupBrush(string key, IBrush fallback)
@@ -150,7 +231,7 @@ public partial class TrendsPage : UserControl
         return fallback;
     }
 
-    static IBrush TranslucentVariant(IBrush b)
+    static IBrush Translucent(IBrush b)
     {
         if (b is ISolidColorBrush sc)
         {

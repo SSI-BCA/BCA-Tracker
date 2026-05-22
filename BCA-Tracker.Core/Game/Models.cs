@@ -102,10 +102,63 @@ namespace BCATracker.Core
 
     public class LobbyData
     {
+        // ── Map / mode info — already captured pre-Phase-3a ───────────────────
         public string MapName  = "Unknown";
         public string ModeName = "Unknown";
         public int    BotCountT1;
         public int    BotCountT2;
+
+        // ── Lobby browser additions ───────────────────────────────────────────
+        // These fields are populated only when the GameState class is
+        // CustomGameGS_C; in-match snapshots leave them at their defaults.
+
+        /// <summary>The lobby's display name (FText at GS+0x310). What the
+        /// host typed into "Game name" when creating the lobby.</summary>
+        public string LobbyName = "";
+
+        /// <summary>int32 at GS+0x418 — max players per team.</summary>
+        public int MaxTeamSize;
+
+        /// <summary>Length of ConnectedPlayerStates array at GS+0x3F0.</summary>
+        public int CurrentPlayerCount;
+
+        /// <summary>True if FGuid at GS+0x3D0 is non-zero (a password is set).
+        /// We never read/transmit the password itself.</summary>
+        public bool HasPassword;
+
+        /// <summary>The local player's CustomGamePS.IsGameLeader. True when
+        /// the local player is the host of the lobby — only hosts publish
+        /// to the lobby directory.</summary>
+        public bool LocalPlayerIsHost;
+
+        /// <summary>The local player's CustomProfileID (FGuid as a 32-char
+        /// hex string). Stable per-player identifier that we'll eventually
+        /// use as the AnonymousAccountId for backend submissions.</summary>
+        public string LocalPlayerProfileId = "";
+
+        /// <summary>The local player's display name, read from the
+        /// engine-level PlayerState. Used as the host name in lobby
+        /// publishing. Works in-lobby (when the scoreboard is empty)
+        /// because PlayerState exists outside of matches too.</summary>
+        public string LocalPlayerName = "";
+
+        /// <summary>All players currently in the lobby (walked from
+        /// CustomGameGS.ConnectedPlayerStates). Populated each tick.
+        /// Empty in-match snapshots (we don't walk this outside lobbies).</summary>
+        public System.Collections.Generic.List<LobbyPlayer> Players = new();
+    }
+
+    /// <summary>One entry from a lobby's player list. Lightweight — we
+    /// don't need the full PlayerInfo / scoreboard shape, just enough
+    /// to render a row in the lobby browser ("Alice (Team 1)", "Bob
+    /// (Team 2)", "Carol (Spectator)" etc).</summary>
+    public class LobbyPlayer
+    {
+        public string Name      = "";
+        public int    Team;
+        public bool   IsHost;
+        public bool   IsBot;
+        public string ProfileId = "";
     }
 
     public class KillFeedEntry

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace BCATracker.Core
@@ -5,6 +6,11 @@ namespace BCATracker.Core
     public static class BCAEnums
     {
         // ── Weapon ───────────────────────────────────────────────────────────────
+        // Order in this array maps to the in-game weapon ID (index = byte
+        // value read from memory). "None" stays at index 0; "Shafter" is
+        // a development weapon not in the public game so we map it to a
+        // placeholder so its ID slot stays correct, and AllWeaponNames()
+        // filters it out for the Weapons page grid.
         static readonly string[] Weapons =
         {
             "None", "Sparkler", "Shafter", "Revoker",
@@ -12,6 +18,14 @@ namespace BCATracker.Core
         };
         public static string WeaponName(byte id)
             => id < Weapons.Length ? Weapons[id] : $"W?{id}";
+
+        /// <summary>Weapons that are hidden in the public-facing Weapons
+        /// page because they aren't part of normal play (devkit-only,
+        /// removed, etc.). Lookups via WeaponName still resolve them.</summary>
+        static readonly HashSet<string> _hiddenWeapons = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Shafter",
+        };
 
         // ── Ability ──────────────────────────────────────────────────────────────
         static readonly string[] Abilities =
@@ -115,6 +129,52 @@ namespace BCATracker.Core
         {
             if (rowName == null) return null;
             return _mapRowToDisplay.TryGetValue(rowName, out string? n) ? n : null;
+        }
+
+        /// <summary>
+        /// All known map display names. The Maps page uses this to render
+        /// every map on first load — even ones the player hasn't played
+        /// yet — so the page has presence on day one and isn't blank for
+        /// new users.
+        /// </summary>
+        /// <summary>Maps that are hidden in the Maps page grid because
+        /// they aren't part of normal public play. Lookups via
+        /// MapRowNameToDisplayName still resolve them so old saved
+        /// matches still display correctly.</summary>
+        static readonly HashSet<string> _hiddenMaps = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Enkidu Nest",
+        };
+
+        public static IReadOnlyList<string> AllMapDisplayNames()
+        {
+            // Project the row→display dictionary; preserve insertion order;
+            // filter out maps that shouldn't appear on the public grid.
+            var list = new List<string>(_mapRowToDisplay.Count);
+            foreach (var kv in _mapRowToDisplay)
+            {
+                if (_hiddenMaps.Contains(kv.Value)) continue;
+                if (!list.Contains(kv.Value))
+                    list.Add(kv.Value);
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// All real weapon names (excludes the "None" sentinel). Used by
+        /// the Weapons page to render a full grid even when the player
+        /// hasn't tried every loadout yet.
+        /// </summary>
+        public static IReadOnlyList<string> AllWeaponNames()
+        {
+            var list = new List<string>(Weapons.Length);
+            for (int i = 1; i < Weapons.Length; i++)  // skip "None" at index 0
+            {
+                string name = Weapons[i];
+                if (_hiddenWeapons.Contains(name)) continue;
+                list.Add(name);
+            }
+            return list;
         }
 
         // ── Mode row-name → display name ─────────────────────────────────────────

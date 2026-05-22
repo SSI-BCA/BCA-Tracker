@@ -4,113 +4,115 @@
              x:Class="BCATracker.UI.Views.TrendsPage">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="32,24,32,32">
+        <StackPanel Margin="32,24,32,32" MaxWidth="1280" HorizontalAlignment="Stretch">
             <TextBlock Classes="page-title" Text="Trends"/>
-            <TextBlock x:Name="SubtitleText"
-                       Classes="muted"
-                       Margin="0,4,0,16"/>
+            <TextBlock x:Name="SubtitleText" Classes="muted" Margin="0,4,0,16"/>
 
-            <!-- Range selector + summary stats -->
+            <!-- Range selector. Buttons are toggle-styled via the .range-btn
+                 and .range-btn.active classes (defined in Controls.axaml). -->
             <Border Classes="card" Padding="20,14" Margin="0,0,0,16">
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="RANGE"
+                               Classes="label"
+                               VerticalAlignment="Center"
+                               Margin="0,0,16,0"/>
+                    <Button x:Name="Range10Btn"  Content="Last 10" Click="Range_Click" Tag="10"  Margin="0,0,4,0"/>
+                    <Button x:Name="Range25Btn"  Content="Last 25" Click="Range_Click" Tag="25"  Margin="0,0,4,0"/>
+                    <Button x:Name="Range50Btn"  Content="Last 50" Click="Range_Click" Tag="50"  Margin="0,0,4,0"/>
+                    <Button x:Name="RangeAllBtn" Content="All"     Click="Range_Click" Tag="0"/>
+                </StackPanel>
+            </Border>
 
-                    <!-- Range buttons -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="RANGE"
-                                   Classes="label"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,12,0"/>
-                        <Button x:Name="Range10Btn"  Content="Last 10" Click="Range_Click" Tag="10"  Margin="0,0,4,0"/>
-                        <Button x:Name="Range25Btn"  Content="Last 25" Click="Range_Click" Tag="25"  Margin="0,0,4,0"/>
-                        <Button x:Name="Range50Btn"  Content="Last 50" Click="Range_Click" Tag="50"  Margin="0,0,4,0"/>
-                        <Button x:Name="RangeAllBtn" Content="All"     Click="Range_Click" Tag="0"/>
+            <!-- Summary strip — five quick numbers for the selected range -->
+            <Border Classes="card" Padding="20,14" Margin="0,0,0,16">
+                <Grid ColumnDefinitions="*,*,*,*,*">
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Classes="label" Text="MATCHES"/>
+                        <TextBlock x:Name="MatchCountTotal" Classes="strip-value"/>
                     </StackPanel>
 
-                    <!-- Summary stats for the selected window -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal">
-                        <StackPanel Margin="20,0">
-                            <TextBlock Classes="label" Text="WIN %" HorizontalAlignment="Right"/>
-                            <TextBlock x:Name="WinPctTotal"
-                                       Classes="stat-mid good"
-                                       FontSize="18"
-                                       HorizontalAlignment="Right"/>
-                        </StackPanel>
-                        <StackPanel Margin="20,0">
-                            <TextBlock Classes="label" Text="AVG K/D" HorizontalAlignment="Right"/>
-                            <TextBlock x:Name="AvgKdTotal"
-                                       Classes="stat-mid"
-                                       FontSize="18"
-                                       HorizontalAlignment="Right"/>
-                        </StackPanel>
-                        <StackPanel Margin="20,0">
-                            <TextBlock Classes="label" Text="AVG DMG" HorizontalAlignment="Right"/>
-                            <TextBlock x:Name="AvgDmgTotal"
-                                       Classes="stat-mid"
-                                       FontSize="18"
-                                       HorizontalAlignment="Right"/>
-                        </StackPanel>
-                        <StackPanel Margin="20,0,0,0">
-                            <TextBlock Classes="label" Text="MATCHES" HorizontalAlignment="Right"/>
-                            <TextBlock x:Name="MatchCountTotal"
-                                       Classes="stat-mid"
-                                       FontSize="18"
-                                       HorizontalAlignment="Right"/>
-                        </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Classes="label" Text="WIN %"/>
+                        <TextBlock x:Name="WinPctTotal" Classes="strip-value good"/>
                     </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Classes="label" Text="AVG K/D"/>
+                        <TextBlock x:Name="AvgKdTotal" Classes="strip-value"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Classes="label" Text="AVG DAMAGE"/>
+                        <TextBlock x:Name="AvgDmgTotal" Classes="strip-value"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Classes="label" Text="AVG ACCURACY"/>
+                        <TextBlock x:Name="AvgAccTotal" Classes="strip-value"/>
+                    </StackPanel>
+
                 </Grid>
             </Border>
 
-            <!-- Chart grid: 2 columns, 3 rows. -->
-            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+            <!-- Featured chart — the big one. Metric pills above the chart
+                 let the user switch what's plotted. -->
+            <Border Classes="card" Padding="24,20" Margin="0,0,0,16">
+                <StackPanel>
+                    <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,16">
+                        <TextBlock Grid.Column="0"
+                                   x:Name="FeaturedChartTitle"
+                                   Text="K/D RATIO"
+                                   Classes="label"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right">
+                            <Button x:Name="MetricKdBtn"      Content="K/D"        Click="Metric_Click" Tag="kd"      Margin="0,0,4,0"/>
+                            <Button x:Name="MetricAccBtn"     Content="Accuracy"   Click="Metric_Click" Tag="acc"     Margin="0,0,4,0"/>
+                            <Button x:Name="MetricDmgBtn"     Content="Damage"     Click="Metric_Click" Tag="dmg"     Margin="0,0,4,0"/>
+                            <Button x:Name="MetricWinRateBtn" Content="Win rate"   Click="Metric_Click" Tag="winrate" Margin="0,0,4,0"/>
+                            <Button x:Name="MetricDeltaBtn"   Content="Damage Δ"   Click="Metric_Click" Tag="delta"   Margin="0,0,4,0"/>
+                            <Button x:Name="MetricAliveBtn"   Content="Time alive" Click="Metric_Click" Tag="alive"/>
+                        </StackPanel>
+                    </Grid>
+                    <ctl:LineChart x:Name="FeaturedChart" Height="320"/>
+                </StackPanel>
+            </Border>
 
-                <Border Grid.Row="0" Grid.Column="0"
-                        Classes="card" Padding="20,16" Margin="0,0,8,16">
+            <!-- Mini chart row — 3 small charts so the user gets a quick
+                 visual of the other metrics. Click → swap into the
+                 featured slot above. -->
+            <TextBlock Classes="section-title" Text="OVERVIEW" Margin="0,12,0,12"/>
+            <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,16">
+
+                <Border Grid.Column="0" Classes="card chart-card" Margin="0,0,8,0">
                     <StackPanel>
-                        <TextBlock Classes="label" Text="K/D RATIO"/>
-                        <ctl:LineChart x:Name="KdChart" Height="180" Margin="0,12,0,0"/>
+                        <TextBlock Classes="label" Text="ACCURACY (%)"/>
+                        <ctl:LineChart x:Name="MiniAccChart" Height="140" Margin="0,12,0,0"
+                                       ShowLastValueBadge="True"/>
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="0" Grid.Column="1"
-                        Classes="card" Padding="20,16" Margin="8,0,0,16">
-                    <StackPanel>
-                        <TextBlock Classes="label" Text="WEAPON ACCURACY (%)"/>
-                        <ctl:LineChart x:Name="AccChart" Height="180" Margin="0,12,0,0"/>
-                    </StackPanel>
-                </Border>
-
-                <Border Grid.Row="1" Grid.Column="0"
-                        Classes="card" Padding="20,16" Margin="0,0,8,16">
+                <Border Grid.Column="1" Classes="card chart-card" Margin="4,0,4,0">
                     <StackPanel>
                         <TextBlock Classes="label" Text="DAMAGE PER MATCH"/>
-                        <ctl:LineChart x:Name="DmgChart" Height="180" Margin="0,12,0,0"/>
+                        <ctl:LineChart x:Name="MiniDmgChart" Height="140" Margin="0,12,0,0"
+                                       ShowLastValueBadge="True"/>
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="1" Grid.Column="1"
-                        Classes="card" Padding="20,16" Margin="8,0,0,16">
+                <Border Grid.Column="2" Classes="card chart-card" Margin="8,0,0,0">
                     <StackPanel>
-                        <TextBlock Classes="label" Text="WIN RATE — 10-MATCH ROLLING (%)"/>
-                        <ctl:LineChart x:Name="WinRateChart" Height="180" Margin="0,12,0,0"/>
+                        <TextBlock Classes="label" Text="WIN RATE (10-MATCH ROLLING)"/>
+                        <ctl:LineChart x:Name="MiniWinRateChart" Height="140" Margin="0,12,0,0"
+                                       ShowLastValueBadge="True"/>
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="2" Grid.Column="0"
-                        Classes="card" Padding="20,16" Margin="0,0,8,0">
-                    <StackPanel>
-                        <TextBlock Classes="label" Text="DAMAGE DELTA (DEALT − TAKEN)"/>
-                        <ctl:LineChart x:Name="DeltaChart" Height="180" Margin="0,12,0,0"/>
-                    </StackPanel>
-                </Border>
-
-                <Border Grid.Row="2" Grid.Column="1"
-                        Classes="card" Padding="20,16" Margin="8,0,0,0">
-                    <StackPanel>
-                        <TextBlock Classes="label" Text="TIME ALIVE (SECONDS)"/>
-                        <ctl:LineChart x:Name="TimeAliveChart" Height="180" Margin="0,12,0,0"/>
-                    </StackPanel>
-                </Border>
             </Grid>
+
         </StackPanel>
     </ScrollViewer>
 </UserControl>

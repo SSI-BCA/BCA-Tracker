@@ -31,15 +31,9 @@ public partial class SettingsPage : UserControl
     {
         _suppressEvents = true;
 
-        RememberCheck.IsChecked = _settings.RememberLauncherChoice;
-
-        string targetTag = _settings.PreferredUI.ToString();
-        foreach (var item in PreferredUICombo.Items)
-            if (item is ComboBoxItem cbi && (cbi.Tag as string) == targetTag)
-            {
-                PreferredUICombo.SelectedItem = cbi;
-                break;
-            }
+        DataSubmissionCheck.IsChecked = _settings.DataSubmissionEnabled;
+        EndpointBox.Text              = _settings.DataSubmissionEndpoint ?? "";
+        AccountIdBox.Text             = _settings.AnonymousAccountId   ?? "";
 
         MatchesFolderBox.Text = _settings.MatchesFolder ?? "";
 
@@ -51,9 +45,6 @@ public partial class SettingsPage : UserControl
         VersionText.Text = "v" + GetVersion();
         RuntimeText.Text = $".NET {Environment.Version} · {RuntimeInformation.OSDescription}";
 
-        // First populate, then refresh on a 1-second timer while the page is
-        // visible. We don't subscribe to LiveMatchService.Tick directly because
-        // these strings only need to refresh once a second, not every snapshot.
         RefreshAboutPanel();
         StartTimer();
 
@@ -144,26 +135,59 @@ public partial class SettingsPage : UserControl
         {
             SavesText.Text = "scan failed: " + ex.Message;
         }
-    }
 
-    void Remember_Changed(object? sender, RoutedEventArgs e)
-    {
-        if (_suppressEvents) return;
-        _settings.RememberLauncherChoice = RememberCheck.IsChecked == true;
-        _settings.Save();
-    }
-
-    void PreferredUI_Changed(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_suppressEvents) return;
-        if (PreferredUICombo.SelectedItem is ComboBoxItem cbi && cbi.Tag is string tag)
+        // Upload status — pulled live from the running uploader.
+        try
         {
-            if (Enum.TryParse<UIChoice>(tag, out UIChoice choice))
+            var up = AppServices.Uploader;
+            if (!_settings.DataSubmissionEnabled)
             {
-                _settings.PreferredUI = choice;
-                _settings.Save();
+                UploadStatusText.Text = "disabled";
+            }
+            else if (string.IsNullOrEmpty(_settings.DataSubmissionEndpoint))
+            {
+                UploadStatusText.Text = "no endpoint set";
+            }
+            else
+            {
+                string lastOk = up.LastSuccessUtc == DateTime.MinValue
+                    ? "never"
+                    : up.LastSuccessUtc.ToLocalTime().ToString("HH:mm:ss");
+                string err = string.IsNullOrEmpty(up.LastError) ? "" : $" · err={up.LastError}";
+                UploadStatusText.Text =
+                    $"sent={up.UploadedCount} pending={up.PendingCount} failed={up.FailedCount} · last ok={lastOk}{err}";
             }
         }
+        catch
+        {
+            // best-effort
+        }
+    }
+
+    void DataSubmission_Changed(object? sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        _settings.DataSubmissionEnabled = DataSubmissionCheck.IsChecked == true;
+        _settings.Save();
+        AppServices.ApplyUploaderConfig();
+    }
+
+    void Endpoint_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        _settings.DataSubmissionEndpoint = EndpointBox.Text?.Trim() ?? "";
+        _settings.Save();
+        AppServices.ApplyUploaderConfig();
+    }
+
+    void ResetAccountId_Click(object? sender, RoutedEventArgs e)
+    {
+        _suppressEvents = true;
+        _settings.AnonymousAccountId = Guid.NewGuid().ToString("N");
+        _settings.Save();
+        AccountIdBox.Text = _settings.AnonymousAccountId;
+        AppServices.ApplyUploaderConfig();
+        _suppressEvents = false;
     }
 
     void MatchesFolder_LostFocus(object? sender, RoutedEventArgs e)
@@ -211,7 +235,7 @@ public partial class SettingsPage : UserControl
                 {
                     new Avalonia.Platform.Storage.FilePickerFileType("Images")
                     {
-                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.webp" },
+                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.webp", "*.gif" },
                     },
                 },
             });
@@ -240,8 +264,15 @@ public partial class SettingsPage : UserControl
         {
             try
             {
+                // Decode at 256px — the settings preview is small but on a
+                // 2x DPI display the actual pixels are 2× the logical size,
+                // so this keeps the thumbnail sharp without bloating memory.
                 using var fs = System.IO.File.OpenRead(path);
-                AvatarPreview.Source = new Avalonia.Media.Imaging.Bitmap(fs);
+                AvatarPreview.Source = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(
+                    fs, 256, Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
+                Avalonia.Media.RenderOptions.SetBitmapInterpolationMode(
+                    AvatarPreview,
+                    Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
                 AvatarPreviewHost.IsVisible = true;
                 AvatarFallback.IsVisible    = false;
                 ProfilePictureStatusText.Text = System.IO.Path.GetFileName(path);
@@ -249,9 +280,12 @@ public partial class SettingsPage : UserControl
             }
             catch
             {
-                // fall through
+                // fall through to the fallback avatar
             }
         }
+
+        // No picture, or it failed to load — show the fallback gradient.
+        AvatarPreview.Source = null;
         AvatarPreviewHost.IsVisible = false;
         AvatarFallback.IsVisible    = true;
         ProfilePictureStatusText.Text = "No picture set — using initial avatar";

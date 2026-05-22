@@ -73,6 +73,17 @@
         <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
     </Style>
 
+    <!-- Stat-strip value: the dense secondary numbers row on Lifetime page.
+         Bigger than label, smaller than stat-value, no line-height tweak so
+         it sits naturally below the label. -->
+    <Style Selector="TextBlock.strip-value">
+        <Setter Property="FontFamily" Value="{DynamicResource Font.Display}"/>
+        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}"/>
+        <Setter Property="Margin" Value="0,2,0,0"/>
+    </Style>
+
     <!-- Modifier classes that combine with any of the above. -->
     <Style Selector="TextBlock.good">
         <Setter Property="Foreground" Value="{DynamicResource Good}"/>
