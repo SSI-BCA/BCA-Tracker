@@ -1,29 +1,30 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="BCATracker.UI.Views.MapsPage">
+             x:Class="BCATracker.UI.Views.RecordsPage">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="32,0,32,32" MaxWidth="1280" HorizontalAlignment="Stretch">
-            <TextBlock x:Name="PageTitleText" Classes="page-title" Text="Maps"/>
+            <TextBlock x:Name="PageTitleText" Classes="page-title" Text="Records"/>
             <TextBlock x:Name="SubtitleText" Classes="muted" Margin="0,4,0,24"/>
 
-            <!-- List view: one card per row, full width. The negative
-                 outer margin cancels the per-item Margin so the list
-                 still aligns flush with the page padding while
-                 successive rows are separated by 16px (2x8). -->
-            <ItemsControl x:Name="CardsHost" Margin="0,-8">
+            <TextBlock x:Name="EmptyHintText"
+                       Classes="muted"
+                       Text="No matches saved yet. Personal records will appear here once you've played a few."
+                       IsVisible="False"
+                       Margin="0,0,0,16"/>
+
+            <ItemsControl x:Name="RecordsHost" Margin="-12,0">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <StackPanel/>
+                        <UniformGrid Columns="3"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemContainerTheme>
                     <ControlTheme TargetType="ContentPresenter">
-                        <Setter Property="Margin" Value="0,8"/>
+                        <Setter Property="Margin" Value="12"/>
                     </ControlTheme>
                 </ItemsControl.ItemContainerTheme>
             </ItemsControl>
-
         </StackPanel>
     </ScrollViewer>
 </UserControl>

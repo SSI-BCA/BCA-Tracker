@@ -27,6 +27,13 @@ public partial class App : Application
             {
                 AppServices.Initialise();
 
+                // Apply the user's saved accent color before any UI is
+                // rendered. Doing it here, not from inside Initialise(),
+                // ensures Application.Current is fully wired up and the
+                // resource swap actually lands on the live resource
+                // dictionary.
+                AccentTheme.Apply(AppServices.Settings.AccentColor ?? "purple");
+
                 var main = new MainWindow();
                 desktop.MainWindow = main;
                 main.Show();

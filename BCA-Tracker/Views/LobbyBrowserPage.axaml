@@ -6,9 +6,15 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="32,24,32,32" MaxWidth="1280" HorizontalAlignment="Stretch">
 
-            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
                 <TextBlock Grid.Column="0" Classes="page-title" Text="Lobbies"/>
                 <Button Grid.Column="1"
+                        x:Name="JoinByIdBtn"
+                        Content="Join by ID"
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,0"
+                        Click="JoinById_Click"/>
+                <Button Grid.Column="2"
                         x:Name="RefreshBtn"
                         Content="Refresh"
                         VerticalAlignment="Center"
@@ -106,7 +112,7 @@
                                FontSize="12"
                                Margin="0,4,0,0"
                                IsVisible="False"
-                               Text="No other players yet — waiting for someone to join."/>
+                               Text="No other players yet - waiting for someone to join."/>
                 </StackPanel>
             </Border>
 
@@ -119,28 +125,76 @@
                     <CheckBox x:Name="LobbyAdvertiseCheck"
                               Content="Advertise my lobby when I'm hosting a BCA custom game"
                               IsCheckedChanged="LobbyAdvertise_Changed"/>
-                    <TextBlock Classes="caption" Margin="0,4,0,0"
-                               TextWrapping="Wrap"
-                               Text="When you host a BCA custom lobby, the tracker creates a private NetBird network for it and posts your lobby to the directory. Other tracker users can join, NetBird connects you both, and you all play over the encrypted tunnel — no port forwarding or UPnP needed."/>
 
-                    <CheckBox x:Name="LobbyForceHostCheck"
-                              Content="I am the host (manual override)"
-                              IsCheckedChanged="LobbyForceHost_Changed"
-                              Margin="0,8,0,0"/>
-                    <TextBlock Classes="caption" Margin="0,4,0,0"
-                               TextWrapping="Wrap"
-                               Text="Bypass the auto-detection of host status. Tick this if you know you're hosting but the tracker doesn't pick it up automatically (offsets can shift across game updates)."/>
-
-                    <TextBlock Classes="label" Text="LOBBY NAME (HOW OTHERS SEE IT)" Margin="0,12,0,4"/>
+                    <TextBlock Classes="label" Text="LOBBY NAME" Margin="0,16,0,4"/>
                     <TextBox x:Name="LobbyNameBox"
-                             Watermark="Leave blank to use ‘{your handle}'s lobby’"
+                             Watermark="Leave blank to use '{your handle}'s lobby'"
                              LostFocus="LobbyName_LostFocus"/>
 
-                    <TextBlock Classes="label" Text="STATUS" Margin="0,12,0,4"/>
+                    <TextBlock Classes="label" Text="STATUS" Margin="0,16,0,4"/>
                     <TextBlock x:Name="HostingStatusText"
                                Classes="muted"
                                FontFamily="Consolas, monospace"
                                Text="(idle)"/>
+
+                    <!-- Advanced: extra controls that most hosts won't touch.
+                         Tucked away so the default view stays simple. -->
+                    <Expander Header="Advanced" Margin="0,16,0,0">
+                        <StackPanel Margin="0,8,0,0">
+
+                            <CheckBox x:Name="LobbyPasswordCheck"
+                                      Content="Password-protect this lobby"
+                                      IsCheckedChanged="LobbyPasswordCheck_Changed"/>
+                            <TextBox x:Name="LobbyPasswordBox"
+                                     Margin="0,4,0,0"
+                                     PasswordChar="*"
+                                     Watermark="Enter a password (4-256 characters)"
+                                     IsVisible="False"
+                                     LostFocus="LobbyPassword_LostFocus"/>
+
+                            <CheckBox x:Name="LobbyHiddenCheck"
+                                      Content="Hide from public list (invite only)"
+                                      Margin="0,12,0,0"
+                                      IsCheckedChanged="LobbyHidden_Changed"/>
+                            <TextBlock Classes="caption" Margin="24,2,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="Only people with the Lobby ID can find your lobby."/>
+
+                            <TextBlock Classes="label" Text="LOBBY ID" Margin="0,16,0,4"/>
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBox x:Name="LobbyIdBox"
+                                         Grid.Column="0"
+                                         IsReadOnly="True"
+                                         IsHitTestVisible="False"
+                                         Focusable="False"
+                                         FontFamily="Consolas, monospace"
+                                         Text="(not hosting yet)"/>
+                                <Button Grid.Column="1"
+                                        x:Name="LobbyIdRevealBtn"
+                                        Margin="8,0,0,0"
+                                        Content="Reveal"
+                                        IsEnabled="False"
+                                        Click="LobbyIdReveal_Click"/>
+                                <Button Grid.Column="2"
+                                        x:Name="LobbyIdCopyBtn"
+                                        Margin="8,0,0,0"
+                                        Content="Copy"
+                                        IsEnabled="False"
+                                        Click="LobbyIdCopy_Click"/>
+                            </Grid>
+                            <TextBlock Classes="caption" Margin="0,4,0,12"
+                                       TextWrapping="Wrap"
+                                       Text="Share this with friends so they can join. Blurred by default - click Reveal to see it, or Copy to send it directly."/>
+
+                            <CheckBox x:Name="LobbyForceHostCheck"
+                                      Content="I am the host (manual override)"
+                                      IsCheckedChanged="LobbyForceHost_Changed"/>
+                            <TextBlock Classes="caption" Margin="24,2,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="Tick this if you're hosting but the tracker doesn't pick it up automatically."/>
+
+                        </StackPanel>
+                    </Expander>
                 </StackPanel>
             </Border>
 

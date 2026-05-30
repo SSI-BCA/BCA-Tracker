@@ -135,7 +135,7 @@ public static class AppServices
                 return;
             }
 
-            BCATracker.Core.DiagLog.Write($"[NB] Installing from {msi}…");
+            BCATracker.Core.DiagLog.Write($"[NB] Installing from {msi}...");
             bool ok = await nb.InstallAsync(msi);
             BCATracker.Core.DiagLog.Write(ok ? "[NB] Install succeeded." : "[NB] Install failed.");
         }

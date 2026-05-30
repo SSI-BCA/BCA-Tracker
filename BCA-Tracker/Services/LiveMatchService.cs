@@ -176,8 +176,8 @@ public sealed class LiveMatchService : IDisposable
                         // justEnded) which the lambda captures by value.
                         wasInMatch = nowInMatch;
 
-                        if (justStarted) DiagLog.Write("[Live] MatchStarted firing — was lobby/menu, now in-match");
-                        if (justEnded)   DiagLog.Write("[Live] MatchEnded firing — was in-match, now post-match/lobby");
+                        if (justStarted) DiagLog.Write("[Live] MatchStarted firing - was lobby/menu, now in-match");
+                        if (justEnded)   DiagLog.Write("[Live] MatchEnded firing - was in-match, now post-match/lobby");
 
                         PostUI(() =>
                         {

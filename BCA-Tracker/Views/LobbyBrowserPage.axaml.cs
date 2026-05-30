@@ -72,6 +72,17 @@ public partial class LobbyBrowserPage : UserControl
             LobbyAdvertiseCheck.IsChecked = s.LobbyAdvertisingEnabled;
             LobbyForceHostCheck.IsChecked = s.LobbyForceHost;
             LobbyNameBox.Text             = s.LobbyAdvertisedName ?? "";
+
+            // Password + Hidden are in-memory only; on a fresh app
+            // start they will be empty/false, but if the user navigates
+            // away and back within the same session we want their
+            // values preserved.
+            bool hasPw = !string.IsNullOrEmpty(s.LobbyPassword);
+            LobbyPasswordCheck.IsChecked = hasPw;
+            LobbyPasswordBox.IsVisible   = hasPw;
+            LobbyPasswordBox.Text        = s.LobbyPassword ?? "";
+
+            LobbyHiddenCheck.IsChecked = s.LobbyHidden;
         }
         finally { _suppressEvents = false; }
     }
@@ -103,6 +114,189 @@ public partial class LobbyBrowserPage : UserControl
         s.Save();
     }
 
+    void LobbyPasswordCheck_Changed(object? sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        bool checkedOn = LobbyPasswordCheck.IsChecked == true;
+        LobbyPasswordBox.IsVisible = checkedOn;
+        if (!checkedOn)
+        {
+            // Clear the stored password when the user unchecks the box.
+            // We don't persist this to disk (it's marked [JsonIgnore]),
+            // but the in-memory copy needs to go so the next heartbeat
+            // tells the backend the lobby is unlocked.
+            AppServices.Settings.LobbyPassword = "";
+            LobbyPasswordBox.Text = "";
+        }
+    }
+
+    void LobbyPassword_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        // Only meaningful when the checkbox is on. If somebody disabled
+        // it after typing, ignore.
+        if (LobbyPasswordCheck.IsChecked != true) return;
+        string pw = LobbyPasswordBox.Text ?? "";
+        if (pw.Length > 0 && pw.Length < 4)
+        {
+            // Defer enforcement to the next focus event so we don't
+            // pop a dialog. Just keep the value; the backend will
+            // reject it with a 400 and StatusText will show why.
+        }
+        AppServices.Settings.LobbyPassword = pw;
+    }
+
+    void LobbyHidden_Changed(object? sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        AppServices.Settings.LobbyHidden = LobbyHiddenCheck.IsChecked == true;
+    }
+
+    // Lobby ID: blurred by default. Reveal swaps Effect=blur(20) for
+    // Effect=null so the text becomes legible. Copy never needs to
+    // unblur - it copies the underlying text regardless of how it's
+    // rendered. Both actions are silent (no toast), the user can see
+    // from the blur state whether reveal worked.
+    bool _lobbyIdRevealed;
+    void LobbyIdReveal_Click(object? sender, RoutedEventArgs e)
+    {
+        _lobbyIdRevealed = !_lobbyIdRevealed;
+        LobbyIdBox.Effect = _lobbyIdRevealed
+            ? null
+            : new Avalonia.Media.BlurEffect { Radius = 20 };
+        LobbyIdRevealBtn.Content = _lobbyIdRevealed ? "Hide" : "Reveal";
+    }
+
+    async void LobbyIdCopy_Click(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string id = LobbyIdBox.Text ?? "";
+            if (string.IsNullOrEmpty(id) || id.StartsWith("(")) return;
+            var clip = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clip is not null) await clip.SetTextAsync(id);
+            LobbyIdCopyBtn.Content = "Copied!";
+            await Task.Delay(1200);
+            LobbyIdCopyBtn.Content = "Copy";
+        }
+        catch { LobbyIdCopyBtn.Content = "Copy failed"; }
+    }
+
+    /// <summary>
+    /// "Join by ID" button: prompts for a lobby ID, fetches that lobby
+    /// from the backend (works for hidden lobbies too), then funnels
+    /// into the regular JoinFlow which handles password prompts and
+    /// the connect dialog.
+    /// </summary>
+    async void JoinById_Click(object? sender, RoutedEventArgs e)
+    {
+        string? id = await PromptForLobbyId();
+        if (string.IsNullOrEmpty(id)) return;
+        id = id.Trim();
+
+        string endpoint = (AppServices.Settings.DataSubmissionEndpoint ?? "").TrimEnd('/');
+        if (string.IsNullOrEmpty(endpoint))
+        {
+            await ShowSimpleDialog("Set a server endpoint in Settings first.");
+            return;
+        }
+
+        var lobby = await AppServices.Lobby.Publisher
+            .FetchByGroupIdAsync(endpoint, id);
+        if (lobby is null)
+        {
+            await ShowSimpleDialog("No lobby found with that ID. Check the ID and try again.");
+            return;
+        }
+        await JoinFlow(lobby);
+    }
+
+    /// <summary>Modal "enter a lobby id" prompt. Returns the typed id
+    /// or null if the user cancelled.</summary>
+    async Task<string?> PromptForLobbyId()
+    {
+        var dlg = new Window
+        {
+            Title = "Join by ID",
+            Width = 460, Height = 200,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false, ShowInTaskbar = false,
+        };
+        string? result = null;
+
+        var content = new StackPanel { Margin = new Thickness(20), Spacing = 12 };
+        content.Children.Add(new TextBlock
+        {
+            Text = "Enter the Lobby ID the host shared with you.",
+            FontSize = 13, TextWrapping = TextWrapping.Wrap,
+            Foreground = LookupBrush("Fg.Secondary", Brushes.LightGray),
+        });
+        var idBox = new TextBox
+        {
+            Watermark = "Lobby ID",
+            FontFamily = new Avalonia.Media.FontFamily("Consolas, monospace"),
+        };
+        content.Children.Add(idBox);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8,
+        };
+        var cancelBtn = new Button { Content = "Cancel" };
+        var joinBtn   = new Button { Content = "Join", Classes = { "primary" } };
+        idBox.KeyDown += (_, ev) =>
+        {
+            if (ev.Key == Avalonia.Input.Key.Enter)
+            {
+                result = idBox.Text ?? "";
+                dlg.Close();
+            }
+        };
+        cancelBtn.Click += (_, _) => { result = null; dlg.Close(); };
+        joinBtn.Click   += (_, _) => { result = idBox.Text ?? ""; dlg.Close(); };
+        buttons.Children.Add(cancelBtn);
+        buttons.Children.Add(joinBtn);
+        content.Children.Add(buttons);
+        dlg.Content = content;
+        dlg.Opened += (_, _) => idBox.Focus();
+
+        Window? owner = Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<Window>(this);
+        if (owner is not null) await dlg.ShowDialog(owner);
+        else dlg.Show();
+
+        return result;
+    }
+
+    async Task ShowSimpleDialog(string message)
+    {
+        var dlg = new Window
+        {
+            Title = "BCA-Tracker",
+            Width = 380, Height = 160,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false, ShowInTaskbar = false,
+        };
+        var ok = new Button
+        {
+            Content = "OK", Classes = { "primary" },
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        ok.Click += (_, _) => dlg.Close();
+        dlg.Content = new StackPanel
+        {
+            Margin = new Thickness(20), Spacing = 16,
+            Children =
+            {
+                new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, FontSize = 13 },
+                ok,
+            },
+        };
+        Window? owner = Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<Window>(this);
+        if (owner is not null) await dlg.ShowDialog(owner);
+        else dlg.Show();
+    }
+
     void Refresh_Click(object? sender, RoutedEventArgs e) => _ = RefreshAsync();
 
     void UpdateHostingStatus()
@@ -112,7 +306,7 @@ public partial class LobbyBrowserPage : UserControl
             var s = AppServices.Settings;
             if (!s.LobbyAdvertisingEnabled)
             {
-                HostingStatusText.Text = "disabled — toggle on to advertise";
+                HostingStatusText.Text = "disabled - toggle on to advertise";
             }
             else if (string.IsNullOrEmpty(s.DataSubmissionEndpoint))
             {
@@ -141,7 +335,7 @@ public partial class LobbyBrowserPage : UserControl
                     ? "Your lobby"
                     : s.LobbyAdvertisedName;
                 ConnectedAddressText.Text = string.IsNullOrEmpty(lobbySvc.ExternalEndpoint)
-                    ? "(waiting for NetBird IP)"
+                    ? "(connecting...)"
                     : lobbySvc.ExternalEndpoint;
                 ConnectedCopyBtn.IsVisible  = !string.IsNullOrEmpty(lobbySvc.ExternalEndpoint);
                 // Hosts don't "leave" — they stop hosting via the
@@ -164,6 +358,31 @@ public partial class LobbyBrowserPage : UserControl
             else
             {
                 ConnectedBanner.IsVisible = false;
+            }
+
+            // Lobby ID display. Show the group id when actively hosting,
+            // a placeholder otherwise. The blur is only applied when
+            // there's a real ID; placeholder text shows plain. Reveal
+            // state is user-controlled and preserved across updates.
+            if (isHostMode && !string.IsNullOrEmpty(lobbySvc.CurrentGroupId))
+            {
+                LobbyIdBox.Text = lobbySvc.CurrentGroupId;
+                LobbyIdBox.Effect = _lobbyIdRevealed
+                    ? null
+                    : new Avalonia.Media.BlurEffect { Radius = 20 };
+                LobbyIdCopyBtn.IsEnabled = true;
+                LobbyIdRevealBtn.IsEnabled = true;
+            }
+            else
+            {
+                LobbyIdBox.Text = "(not hosting yet)";
+                LobbyIdBox.Effect = null;
+                LobbyIdCopyBtn.IsEnabled = false;
+                LobbyIdRevealBtn.IsEnabled = false;
+                // Reset reveal state so the next time we host, the ID
+                // starts blurred again.
+                _lobbyIdRevealed = false;
+                LobbyIdRevealBtn.Content = "Reveal";
             }
         }
         catch { }
@@ -248,7 +467,7 @@ public partial class LobbyBrowserPage : UserControl
     async void ConnectedLeave_Click(object? sender, RoutedEventArgs e)
     {
         ConnectedLeaveBtn.IsEnabled = false;
-        ConnectedLeaveBtn.Content   = "Leaving…";
+        ConnectedLeaveBtn.Content   = "Leaving...";
         try
         {
             await AppServices.Lobby.LeaveJoinedLobbyAsync();
@@ -403,15 +622,105 @@ public partial class LobbyBrowserPage : UserControl
             IsEnabled = !isFull,
             [Grid.ColumnProperty] = 3,
         };
-        joinBtn.Click += (_, _) => ShowJoinDialog(lobby);
+        joinBtn.Click += (_, _) => _ = JoinFlow(lobby);
         grid.Children.Add(joinBtn);
 
         card.Content = grid;
-        card.Click += (_, _) => { if (!isFull) ShowJoinDialog(lobby); };
+        card.Click += (_, _) => { if (!isFull) _ = JoinFlow(lobby); };
         return card;
     }
 
-    async void ShowJoinDialog(LobbyInfo lobby)
+    /// <summary>
+    /// Top-level join entry. If the lobby is password-protected, pops a
+    /// modal asking for the password; otherwise jumps straight to the
+    /// connect dialog. The password (if any) is plumbed through
+    /// JoinLobbyAsync to the backend.
+    /// </summary>
+    async Task JoinFlow(LobbyInfo lobby)
+    {
+        string password = "";
+        if (lobby.HasPassword)
+        {
+            password = await PromptForPassword(lobby) ?? "";
+            if (string.IsNullOrEmpty(password)) return; // user cancelled or left empty
+        }
+        await ShowJoinDialog(lobby, password);
+    }
+
+    /// <summary>
+    /// Modal password prompt. Returns the typed password, or null if
+    /// the user cancelled / closed the dialog without submitting.
+    /// </summary>
+    async Task<string?> PromptForPassword(LobbyInfo lobby)
+    {
+        var dlg = new Window
+        {
+            Title = "Password required",
+            Width = 420, Height = 220,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false, ShowInTaskbar = false,
+        };
+
+        string? result = null;
+
+        var content = new StackPanel { Margin = new Thickness(20), Spacing = 12 };
+        content.Children.Add(new TextBlock
+        {
+            Text = lobby.LobbyName,
+            FontSize = 16, FontWeight = FontWeight.Bold,
+            Foreground = LookupBrush("Fg.Primary", Brushes.White),
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = "This lobby is password-protected. Ask the host for the password and enter it below.",
+            FontSize = 12, TextWrapping = TextWrapping.Wrap,
+            Foreground = LookupBrush("Fg.Secondary", Brushes.LightGray),
+        });
+
+        var pwBox = new TextBox
+        {
+            PasswordChar = '*',
+            Watermark = "Password",
+        };
+        content.Children.Add(pwBox);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8,
+        };
+        var cancelBtn = new Button { Content = "Cancel" };
+        var joinBtn   = new Button { Content = "Join", Classes = { "primary" } };
+
+        // Enter key submits.
+        pwBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == Avalonia.Input.Key.Enter)
+            {
+                result = pwBox.Text ?? "";
+                dlg.Close();
+            }
+        };
+        cancelBtn.Click += (_, _) => { result = null; dlg.Close(); };
+        joinBtn.Click   += (_, _) => { result = pwBox.Text ?? ""; dlg.Close(); };
+
+        buttons.Children.Add(cancelBtn);
+        buttons.Children.Add(joinBtn);
+        content.Children.Add(buttons);
+
+        dlg.Content = content;
+        // Focus the textbox so the user can just start typing.
+        dlg.Opened += (_, _) => pwBox.Focus();
+
+        Window? owner = Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<Window>(this);
+        if (owner is not null) await dlg.ShowDialog(owner);
+        else dlg.Show();
+
+        return result;
+    }
+
+    async Task ShowJoinDialog(LobbyInfo lobby, string password)
     {
         var dlg = new Window
         {
@@ -500,11 +809,12 @@ public partial class LobbyBrowserPage : UserControl
         // the dialog shows "Connecting to lobby network…".
         _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            string virtualIp = await AppServices.Lobby.JoinLobbyAsync(lobby);
+            string virtualIp = await AppServices.Lobby.JoinLobbyAsync(lobby, password);
             if (string.IsNullOrEmpty(virtualIp))
             {
-                statusText.Text = "Failed to join the lobby network. " +
-                    "Check that the NetBird service is running and the server endpoint is set in Settings.";
+                statusText.Text = lobby.HasPassword
+                    ? "Wrong password, or the server isn't reachable."
+                    : "Couldn't connect to the lobby. The server may be unreachable.";
                 statusText.Foreground = LookupBrush("Danger", Brushes.Red);
                 return;
             }

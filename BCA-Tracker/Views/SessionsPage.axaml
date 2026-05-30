@@ -1,17 +1,22 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="BCATracker.UI.Views.MapsPage">
+             x:Class="BCATracker.UI.Views.SessionsPage">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="32,0,32,32" MaxWidth="1280" HorizontalAlignment="Stretch">
-            <TextBlock x:Name="PageTitleText" Classes="page-title" Text="Maps"/>
+            <TextBlock x:Name="PageTitleText" Classes="page-title" Text="Sessions"/>
             <TextBlock x:Name="SubtitleText" Classes="muted" Margin="0,4,0,24"/>
 
-            <!-- List view: one card per row, full width. The negative
-                 outer margin cancels the per-item Margin so the list
-                 still aligns flush with the page padding while
-                 successive rows are separated by 16px (2x8). -->
-            <ItemsControl x:Name="CardsHost" Margin="0,-8">
+            <!-- Hint shown when no sessions exist. Hidden when the list
+                 has rows. -->
+            <TextBlock x:Name="EmptyHintText"
+                       Classes="muted"
+                       Text="No matches saved yet. Play a match and it'll show up here grouped by session."
+                       IsVisible="False"
+                       Margin="0,0,0,16"/>
+
+            <!-- One card per session, newest first. -->
+            <ItemsControl x:Name="SessionsHost" Margin="0,-8">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel/>
@@ -23,7 +28,6 @@
                     </ControlTheme>
                 </ItemsControl.ItemContainerTheme>
             </ItemsControl>
-
         </StackPanel>
     </ScrollViewer>
 </UserControl>

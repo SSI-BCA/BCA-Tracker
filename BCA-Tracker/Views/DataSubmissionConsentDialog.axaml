@@ -16,7 +16,7 @@
                            FontSize="20" FontWeight="Bold"
                            Foreground="{DynamicResource Fg.Primary}"
                            Margin="0,0,0,4"/>
-                <TextBlock Text="One-time question — you can change this any time in Settings."
+                <TextBlock Text="One-time question - you can change this any time in Settings."
                            Foreground="{DynamicResource Fg.Muted}"/>
             </StackPanel>
 
@@ -35,7 +35,7 @@
                     <TextBlock TextWrapping="Wrap"
                                Foreground="{DynamicResource Fg.Secondary}"
                                Margin="0,0,0,8"
-                               Text="• Match results — scoreboard, kill feed, per-player loadouts, stat counters"/>
+                               Text="• Match results - scoreboard, kill feed, per-player loadouts, stat counters"/>
                     <TextBlock TextWrapping="Wrap"
                                Foreground="{DynamicResource Fg.Secondary}"
                                Margin="0,0,0,8"

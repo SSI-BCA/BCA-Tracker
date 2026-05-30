@@ -37,6 +37,15 @@ public partial class SettingsPage : UserControl
 
         MatchesFolderBox.Text = _settings.MatchesFolder ?? "";
 
+        PlayerNameBox.Text = _settings.PlayerNameOverride ?? "";
+
+        // Pick the ComboBoxItem whose Tag matches the saved value.
+        // ComboBox doesn't bind to a tag value out of the box; we
+        // iterate the items and select by tag string.
+        SelectComboByTag(AccentColorCombo, _settings.AccentColor ?? "purple");
+        SelectComboByTag(CloseBehaviorCombo, _settings.CloseBehavior ?? "quit");
+        AutoJumpCheck.IsChecked = _settings.AutoJumpToLiveMatch;
+
         DiscordEnabledCheck.IsChecked = _settings.DiscordRpcEnabled;
         DiscordClientIdBox.Text       = _settings.DiscordClientId ?? "";
 
@@ -180,14 +189,242 @@ public partial class SettingsPage : UserControl
         AppServices.ApplyUploaderConfig();
     }
 
-    void ResetAccountId_Click(object? sender, RoutedEventArgs e)
+    void PlayerName_LostFocus(object? sender, RoutedEventArgs e)
     {
-        _suppressEvents = true;
-        _settings.AnonymousAccountId = Guid.NewGuid().ToString("N");
+        if (_suppressEvents) return;
+        // Trim and length-cap. BCA's own player names are capped at
+        // 32 characters; we mirror that so an excessively long fallback
+        // doesn't break layout downstream.
+        string name = (PlayerNameBox.Text ?? "").Trim();
+        if (name.Length > 32) name = name.Substring(0, 32);
+        _settings.PlayerNameOverride = name;
         _settings.Save();
-        AccountIdBox.Text = _settings.AnonymousAccountId;
-        AppServices.ApplyUploaderConfig();
-        _suppressEvents = false;
+    }
+
+    void AccentColor_Changed(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        if (AccentColorCombo.SelectedItem is not ComboBoxItem item) return;
+        string name = item.Tag?.ToString() ?? "purple";
+        _settings.AccentColor = name;
+        _settings.Save();
+        // Live update so the user sees the change without restarting.
+        AccentTheme.Apply(name);
+    }
+
+    /// <summary>
+    /// "Open config file" button next to the chart-colors description.
+    /// Opens chart-colors.json in the system default editor (Notepad on
+    /// Windows), creating the file with defaults first if it doesn't
+    /// exist. Users edit, save, and the change picks up next time
+    /// they open the Trends page.
+    /// </summary>
+    void ChartColorsOpen_Click(object? sender, RoutedEventArgs e)
+    {
+        // Force-create the file with defaults so the user always has
+        // something concrete to edit, even on a fresh install.
+        ChartColors.Reload();
+        string path = ChartColors.ConfigPath();
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // If shell-execute fails (no editor associated with .json),
+            // fall back to opening the containing folder so the user
+            // can locate the file themselves.
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = System.IO.Path.GetDirectoryName(path)!,
+                    UseShellExecute = true,
+                });
+            }
+            catch { }
+        }
+    }
+
+    void AutoJump_Changed(object? sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        _settings.AutoJumpToLiveMatch = AutoJumpCheck.IsChecked == true;
+        _settings.Save();
+    }
+
+    void CloseBehavior_Changed(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        if (CloseBehaviorCombo.SelectedItem is not ComboBoxItem item) return;
+        _settings.CloseBehavior = item.Tag?.ToString() ?? "quit";
+        _settings.Save();
+    }
+
+    /// <summary>Pick the ComboBoxItem whose Tag string equals the
+    /// supplied value, case-insensitively. No match -> select index 0.
+    /// </summary>
+    static void SelectComboByTag(ComboBox combo, string tag)
+    {
+        for (int i = 0; i < combo.ItemCount; i++)
+        {
+            if (combo.Items[i] is ComboBoxItem item &&
+                string.Equals(item.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase))
+            {
+                combo.SelectedIndex = i;
+                return;
+            }
+        }
+        combo.SelectedIndex = 0;
+    }
+
+    async void RequestData_Click(object? sender, RoutedEventArgs e)
+    {
+        string endpoint = (_settings.DataSubmissionEndpoint ?? "").TrimEnd('/');
+        string accountId = _settings.AnonymousAccountId ?? "";
+        if (string.IsNullOrEmpty(endpoint))
+        {
+            DataActionStatusText.Text = "Set a server endpoint first.";
+            return;
+        }
+        if (string.IsNullOrEmpty(accountId))
+        {
+            DataActionStatusText.Text = "No installation ID. Nothing to request.";
+            return;
+        }
+
+        RequestDataBtn.IsEnabled = false;
+        DataActionStatusText.Text = "Requesting...";
+        try
+        {
+            using var http = new System.Net.Http.HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(20),
+            };
+            string url = $"{endpoint}/v1/matches/by-account/{accountId}";
+            using var resp = await http.GetAsync(url);
+            if (!resp.IsSuccessStatusCode)
+            {
+                DataActionStatusText.Text = $"Server returned {(int)resp.StatusCode} {resp.ReasonPhrase}.";
+                return;
+            }
+            string json = await resp.Content.ReadAsStringAsync();
+
+            // Save the dump next to the matches folder so the user can
+            // open it from File Explorer.
+            string root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string dir  = Path.Combine(root, "BCA-Tracker");
+            Directory.CreateDirectory(dir);
+            string file = Path.Combine(dir, $"data-export-{DateTime.Now:yyyy-MM-dd-HHmmss}.json");
+            await File.WriteAllTextAsync(file, json);
+
+            DataActionStatusText.Text = $"Saved to {file}";
+
+            // Open the containing folder so the user can grab the file.
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = dir,
+                    UseShellExecute = true,
+                });
+            }
+            catch { }
+        }
+        catch (Exception ex)
+        {
+            DataActionStatusText.Text = $"Request failed: {ex.Message}";
+        }
+        finally
+        {
+            RequestDataBtn.IsEnabled = true;
+        }
+    }
+
+    async void DeleteData_Click(object? sender, RoutedEventArgs e)
+    {
+        string endpoint = (_settings.DataSubmissionEndpoint ?? "").TrimEnd('/');
+        string accountId = _settings.AnonymousAccountId ?? "";
+        if (string.IsNullOrEmpty(endpoint))
+        {
+            DataActionStatusText.Text = "Set a server endpoint first.";
+            return;
+        }
+        if (string.IsNullOrEmpty(accountId))
+        {
+            DataActionStatusText.Text = "No installation ID. Nothing to delete.";
+            return;
+        }
+
+        // Confirmation dialog: this is destructive and server-side
+        // irreversible, so do not just rip on a single click.
+        var owner = TopLevel.GetTopLevel(this) as Window;
+        var confirm = new Window
+        {
+            Title = "Delete server data?",
+            Width = 420,
+            Height = 180,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+        };
+        bool? confirmed = null;
+        var yes = new Button { Content = "Delete everything", Classes = { "primary" } };
+        var no  = new Button { Content = "Cancel", Margin = new Avalonia.Thickness(8, 0, 0, 0) };
+        yes.Click += (_, _) => { confirmed = true;  confirm.Close(); };
+        no.Click  += (_, _) => { confirmed = false; confirm.Close(); };
+
+        confirm.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "This will permanently delete all match data the server has stored under your installation ID. Local files on this machine are not affected.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                    Children = { yes, no },
+                },
+            },
+        };
+        if (owner is not null) await confirm.ShowDialog(owner);
+        else confirm.Show();
+        if (confirmed != true) { DataActionStatusText.Text = "Delete cancelled."; return; }
+
+        DeleteDataBtn.IsEnabled = false;
+        DataActionStatusText.Text = "Deleting...";
+        try
+        {
+            using var http = new System.Net.Http.HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(20),
+            };
+            string url = $"{endpoint}/v1/matches/by-account/{accountId}";
+            using var resp = await http.DeleteAsync(url);
+            if (!resp.IsSuccessStatusCode)
+            {
+                DataActionStatusText.Text = $"Server returned {(int)resp.StatusCode} {resp.ReasonPhrase}.";
+                return;
+            }
+            DataActionStatusText.Text = "Done. All your match data has been removed from the server.";
+        }
+        catch (Exception ex)
+        {
+            DataActionStatusText.Text = $"Delete failed: {ex.Message}";
+        }
+        finally
+        {
+            DeleteDataBtn.IsEnabled = true;
+        }
     }
 
     void MatchesFolder_LostFocus(object? sender, RoutedEventArgs e)
@@ -288,7 +525,7 @@ public partial class SettingsPage : UserControl
         AvatarPreview.Source = null;
         AvatarPreviewHost.IsVisible = false;
         AvatarFallback.IsVisible    = true;
-        ProfilePictureStatusText.Text = "No picture set — using initial avatar";
+        ProfilePictureStatusText.Text = "No picture set - using initial avatar";
     }
 
     static string GetVersion()

@@ -18,7 +18,7 @@ public partial class TrendsPage : UserControl
     /// <summary>Which metric is shown in the big featured chart at the top.</summary>
     string _featuredMetric = "kd";
 
-    // Cached series for the current window — recomputed in Refresh and reused
+    // Cached series for the current window. Recomputed in Refresh and reused
     // when only the featured-metric selection changes.
     double[] _kd = Array.Empty<double>();
     double[] _acc = Array.Empty<double>();
@@ -26,6 +26,12 @@ public partial class TrendsPage : UserControl
     double[] _winRate = Array.Empty<double>();
     double[] _delta = Array.Empty<double>();
     double[] _alive = Array.Empty<double>();
+
+    /// <summary>Per-point hover labels. Same length as the metric
+    /// arrays; one entry per match in the active window, e.g.
+    /// "2026-05-20 14:33". Used by LineChart.SetLabels for the
+    /// tooltip on hover.</summary>
+    string[] _labels = Array.Empty<string>();
 
     public TrendsPage()
     {
@@ -46,6 +52,7 @@ public partial class TrendsPage : UserControl
     {
         if (sender is Button b && b.Tag is string tag)
         {
+            if (tag == _featuredMetric) return;
             _featuredMetric = tag;
             UpdateFeaturedChart();
             UpdateMetricButtonStyles();
@@ -82,15 +89,15 @@ public partial class TrendsPage : UserControl
             SubtitleText.Text = "No matches saved yet.";
             WinPctTotal.Text = AvgKdTotal.Text = AvgDmgTotal.Text = MatchCountTotal.Text = AvgAccTotal.Text = "—";
             _kd = _acc = _dmg = _winRate = _delta = _alive = Array.Empty<double>();
+            _labels = Array.Empty<string>();
             UpdateFeaturedChart();
-            UpdateMiniCharts();
             UpdateMetricButtonStyles();
             return;
         }
 
         SubtitleText.Text = _rangeLimit == 0
-            ? $"All {rows.Count} match" + (rows.Count == 1 ? "" : "es") + " — oldest on the left."
-            : $"Last {rows.Count} match" + (rows.Count == 1 ? "" : "es") + " — oldest on the left.";
+            ? $"All {rows.Count} match" + (rows.Count == 1 ? "" : "es") + ", oldest on the left."
+            : $"Last {rows.Count} match" + (rows.Count == 1 ? "" : "es") + ", oldest on the left.";
 
         // Per-match series
         _kd = rows.Select(r =>
@@ -100,6 +107,13 @@ public partial class TrendsPage : UserControl
         _dmg   = rows.Select(r => r.Me!.Damage).ToArray();
         _delta = rows.Select(r => r.Me!.Damage - r.Me.ReceivedShieldDmg).ToArray();
         _alive = rows.Select(r => r.Me!.TimeAliveSecs).ToArray();
+
+        // Per-point hover labels: date+time of each match, in the
+        // user's local format. We format here once instead of every
+        // chart refresh, since dates don't change.
+        _labels = rows.Select(r =>
+            r.Match.PlayedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+        ).ToArray();
 
         // Rolling 10-match win rate.
         _winRate = new double[rows.Count];
@@ -137,7 +151,6 @@ public partial class TrendsPage : UserControl
         AvgAccTotal.Text     = avgAcc.ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
         UpdateFeaturedChart();
-        UpdateMiniCharts();
         UpdateMetricButtonStyles();
     }
 
@@ -148,45 +161,64 @@ public partial class TrendsPage : UserControl
     /// </summary>
     void UpdateFeaturedChart()
     {
-        IBrush accent = LookupBrush("Accent",   Brushes.MediumPurple);
-        IBrush good   = LookupBrush("Good",     Brushes.MediumSeaGreen);
-        IBrush danger = LookupBrush("Danger",   Brushes.IndianRed);
-        IBrush teamA  = LookupBrush("Team.A",   Brushes.SteelBlue);
-        IBrush muted  = LookupBrush("Fg.Muted", Brushes.Gray);
+        // Reload colors from disk so live edits to chart-colors.json
+        // take effect on the next refresh.
+        ChartColors.Reload();
 
         switch (_featuredMetric)
         {
             case "kd":
+            {
                 FeaturedChartTitle.Text = "K/D RATIO PER MATCH";
                 FeaturedChart.HigherIsBetter = true;
-                FeaturedChart.SetData(_kd, "0.00", lineColor: accent, fillColor: Translucent(accent));
+                var c = ChartColors.For("kd");
+                FeaturedChart.SetDirectionalData(_kd, c.Up, c.Down, "0.00");
                 break;
+            }
             case "acc":
+            {
                 FeaturedChartTitle.Text = "WEAPON ACCURACY (%)";
                 FeaturedChart.HigherIsBetter = true;
-                FeaturedChart.SetData(_acc, "0", suffix: "%", lineColor: good, fillColor: Translucent(good));
+                var c = ChartColors.For("acc");
+                FeaturedChart.SetDirectionalData(_acc, c.Up, c.Down, "0", suffix: "%");
                 break;
+            }
             case "dmg":
+            {
                 FeaturedChartTitle.Text = "DAMAGE PER MATCH";
                 FeaturedChart.HigherIsBetter = true;
-                FeaturedChart.SetData(_dmg, "#,0", lineColor: danger, fillColor: Translucent(danger));
+                var c = ChartColors.For("dmg");
+                FeaturedChart.SetDirectionalData(_dmg, c.Up, c.Down, "#,0");
                 break;
+            }
             case "winrate":
-                FeaturedChartTitle.Text = "WIN RATE — 10-MATCH ROLLING (%)";
+            {
+                FeaturedChartTitle.Text = "WIN RATE - 10-MATCH ROLLING (%)";
                 FeaturedChart.HigherIsBetter = true;
-                FeaturedChart.SetData(_winRate, "0", suffix: "%", lineColor: good, fillColor: Translucent(good));
+                var c = ChartColors.For("winRate");
+                FeaturedChart.SetDirectionalData(_winRate, c.Up, c.Down, "0", suffix: "%");
                 break;
+            }
             case "delta":
-                FeaturedChartTitle.Text = "DAMAGE DELTA (DEALT − TAKEN)";
+            {
+                FeaturedChartTitle.Text = "DAMAGE DELTA (DEALT - TAKEN)";
                 FeaturedChart.HigherIsBetter = true;
-                FeaturedChart.SetData(_delta, "#,0", lineColor: teamA, fillColor: Translucent(teamA));
+                var c = ChartColors.For("delta");
+                FeaturedChart.SetDirectionalData(_delta, c.Up, c.Down, "#,0");
                 break;
+            }
             case "alive":
+            {
                 FeaturedChartTitle.Text = "TIME ALIVE PER MATCH (SECONDS)";
-                FeaturedChart.HigherIsBetter = true;  // longer = better in this game
-                FeaturedChart.SetData(_alive, "0", suffix: "s", lineColor: muted, fillColor: Translucent(muted));
+                FeaturedChart.HigherIsBetter = true;
+                var c = ChartColors.For("alive");
+                FeaturedChart.SetDirectionalData(_alive, c.Up, c.Down, "0", suffix: "s");
                 break;
+            }
         }
+        // Apply hover labels last so they show on whichever metric is
+        // active. SetLabels works after SetData/SetDirectionalData.
+        FeaturedChart.SetLabels(_labels);
     }
 
     /// <summary>
@@ -195,22 +227,6 @@ public partial class TrendsPage : UserControl
     /// user can scan the small ones and click into whichever looks
     /// interesting (future enhancement: make them clickable to swap).
     /// </summary>
-    void UpdateMiniCharts()
-    {
-        IBrush accent = LookupBrush("Accent",   Brushes.MediumPurple);
-        IBrush good   = LookupBrush("Good",     Brushes.MediumSeaGreen);
-        IBrush danger = LookupBrush("Danger",   Brushes.IndianRed);
-
-        MiniAccChart.HigherIsBetter = true;
-        MiniAccChart.SetData(_acc, "0", suffix: "%", lineColor: good, fillColor: Translucent(good));
-
-        MiniDmgChart.HigherIsBetter = true;
-        MiniDmgChart.SetData(_dmg, "#,0", lineColor: danger, fillColor: Translucent(danger));
-
-        MiniWinRateChart.HigherIsBetter = true;
-        MiniWinRateChart.SetData(_winRate, "0", suffix: "%", lineColor: accent, fillColor: Translucent(accent));
-    }
-
     void UpdateMetricButtonStyles()
     {
         // The active metric pill loses its "ghost" class so the styling

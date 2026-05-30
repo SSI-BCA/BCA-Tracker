@@ -41,6 +41,12 @@ public partial class MainWindow : Window
 
         Opened += (_, _) => NavigateTo(typeof(HomePage));
 
+        // Minimize-to-tray. If the user picked "tray" in Settings, the
+        // first close-attempt hides the window and installs a tray icon
+        // instead of quitting. The tray icon's "Quit" menu sets a flag
+        // and re-triggers Close, which falls through normally.
+        Closing += OnClosing;
+
         // Poll UpdateChecker for results. The check itself is fired
         // off by AppServices.Initialise(); here we only watch for the
         // result to land so we can show the banner. 5s poll is fine —
@@ -89,7 +95,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(u.LatestSetupUrl)) return;
 
         UpdateDownloadBtn.IsEnabled = false;
-        UpdateDownloadBtn.Content   = "Downloading…";
+        UpdateDownloadBtn.Content   = "Downloading...";
 
         try
         {
@@ -147,11 +153,10 @@ public partial class MainWindow : Window
         Nav.Items.Add(new NavItem("Live Match",     typeof(LiveMatchPage)));
         Nav.Items.Add(new NavItem("Home",           typeof(HomePage)));
         Nav.Items.Add(new NavItem("Match History",  typeof(MatchHistoryPage)));
-        Nav.Items.Add(new NavItem("Trends",         typeof(TrendsPage)));
-        Nav.Items.Add(new NavItem("Maps",           typeof(MapsPage)));
-        Nav.Items.Add(new NavItem("Weapons",        typeof(WeaponsPage)));
+        Nav.Items.Add(new NavItem("Stats",          typeof(StatsPage)));
         Nav.Items.Add(new NavItem("Lobbies",        typeof(LobbyBrowserPage)));
         Nav.Items.Add(new NavItem("Settings",       typeof(SettingsPage)));
+        Nav.Items.Add(new NavItem("About",          typeof(AboutPage)));
     }
 
     void OnNavRequested(object? sender, NavItem item) => NavigateTo(item.PageType);
@@ -184,6 +189,10 @@ public partial class MainWindow : Window
     /// </summary>
     void OnMatchStarted(MatchSnapshot snap)
     {
+        // User can opt out: if the setting is off, stay on whatever page
+        // they're on and don't yank them. The Live Match page is still
+        // reachable from the nav bar like normal.
+        if (!AppServices.Settings.AutoJumpToLiveMatch) return;
         if (ContentHost.Content is LiveMatchPage) return;  // already there
         NavigateTo(typeof(LiveMatchPage));
     }
@@ -248,5 +257,80 @@ public partial class MainWindow : Window
         }
         Version? v = asm.GetName().Version;
         return v is null ? "?" : $"{v.Major}.{v.Minor}.{v.Build}";
+    }
+
+    // ── Minimize-to-tray ──────────────────────────────────────────────
+
+    /// <summary>Set true by the tray menu's Quit handler so the next
+    /// Closing event falls through to a real shutdown instead of
+    /// re-hiding to tray.</summary>
+    bool _quittingForReal;
+
+    /// <summary>Active tray icon, or null when not in tray mode. Created
+    /// lazily on first hide so the icon doesn't appear until the user
+    /// actually triggers minimize-to-tray.</summary>
+    Avalonia.Controls.TrayIcon? _trayIcon;
+
+    void OnClosing(object? sender, Avalonia.Controls.WindowClosingEventArgs e)
+    {
+        // Tray mode opt-out: if the user picked "quit" (default), or
+        // we're shutting down for real, behave normally.
+        if (_quittingForReal) return;
+        if (!string.Equals(AppServices.Settings.CloseBehavior, "tray", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        // Intercept the close and hide instead. AppServices stays
+        // alive, so the lobby publisher, Discord RPC, match watcher
+        // etc. keep running in the background.
+        e.Cancel = true;
+        Hide();
+        EnsureTrayIcon();
+    }
+
+    void EnsureTrayIcon()
+    {
+        if (_trayIcon is not null) return;
+
+        _trayIcon = new Avalonia.Controls.TrayIcon
+        {
+            ToolTipText = "BCA-Tracker (background)",
+            // No icon file yet; once you drop icon.ico into Assets/,
+            // we can set _trayIcon.Icon = new WindowIcon("...") here.
+            // Without an icon, Windows shows a default placeholder which
+            // is ugly but not broken.
+        };
+        var menu = new Avalonia.Controls.NativeMenu();
+
+        var show = new Avalonia.Controls.NativeMenuItem("Show BCA-Tracker");
+        show.Click += (_, _) => ShowFromTray();
+
+        var quit = new Avalonia.Controls.NativeMenuItem("Quit");
+        quit.Click += (_, _) =>
+        {
+            _quittingForReal = true;
+            // Cleanup tray *before* close so the icon vanishes immediately
+            // rather than lingering as a ghost in the system tray.
+            if (_trayIcon is not null) { _trayIcon.IsVisible = false; _trayIcon = null; }
+            Close();
+        };
+
+        menu.Items.Add(show);
+        menu.Items.Add(new Avalonia.Controls.NativeMenuItemSeparator());
+        menu.Items.Add(quit);
+        _trayIcon.Menu = menu;
+
+        // Single-click on the icon also restores the window. This
+        // matches what users expect from other system-tray apps.
+        _trayIcon.Clicked += (_, _) => ShowFromTray();
+
+        _trayIcon.IsVisible = true;
+    }
+
+    void ShowFromTray()
+    {
+        Show();
+        WindowState = Avalonia.Controls.WindowState.Normal;
+        Activate();
+        if (_trayIcon is not null) { _trayIcon.IsVisible = false; _trayIcon = null; }
     }
 }

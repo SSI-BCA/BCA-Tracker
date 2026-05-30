@@ -3,7 +3,7 @@
              x:Class="BCATracker.UI.Views.SettingsPage">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="32,24,32,32" MaxWidth="800" HorizontalAlignment="Left">
+        <StackPanel Margin="32,24,32,32" MaxWidth="1280" HorizontalAlignment="Stretch">
             <TextBlock Classes="page-title" Text="Settings"/>
             <TextBlock Classes="muted" Margin="0,4,0,24"
                        Text="Configure data submission, paths and integrations. Saved to %AppData%\BCA-Tracker\settings.json."/>
@@ -17,27 +17,38 @@
                               IsCheckedChanged="DataSubmission_Changed"/>
                     <TextBlock Classes="caption" Margin="0,4,0,0"
                                TextWrapping="Wrap"
-                               Text="When enabled, finished match files are uploaded in the background. They contain scoreboard, kill feed, loadouts and stat counters — same data the kill feed shows in-game. No Steam/Epic IDs, IP addresses or Windows usernames are uploaded."/>
+                               Text="When enabled, finished match files are uploaded in the background. They contain scoreboard, kill feed, loadouts and stat counters. The same data the kill feed shows in-game. No Steam or Epic IDs, IP addresses or Windows usernames are uploaded."/>
 
                     <TextBlock Classes="label" Text="SERVER ENDPOINT" Margin="0,12,0,4"/>
                     <TextBox x:Name="EndpointBox"
                              Watermark="https://example.com (leave blank to disable)"
                              LostFocus="Endpoint_LostFocus"/>
                     <TextBlock Classes="caption" Margin="0,4,0,0"
-                               Text="Uploads POST to {endpoint}/v1/matches. Leave blank if you don't want to upload anywhere — the toggle above will then sit idle."/>
+                               Text="Uploads go to {endpoint}/v1/matches. Leave blank if you don't want to upload anywhere. The toggle above will then sit idle."/>
 
                     <TextBlock Classes="label" Text="ANONYMOUS INSTALLATION ID" Margin="0,12,0,4"/>
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBox x:Name="AccountIdBox"
-                                 Grid.Column="0"
-                                 IsReadOnly="True"
-                                 FontFamily="Consolas, monospace"/>
-                        <Button Grid.Column="1" Content="Reset to fresh ID"
-                                Margin="8,0,0,0"
-                                Click="ResetAccountId_Click"/>
-                    </Grid>
+                    <TextBox x:Name="AccountIdBox"
+                             IsReadOnly="True"
+                             FontFamily="Consolas, monospace"/>
                     <TextBlock Classes="caption" Margin="0,4,0,0"
-                               Text="Random GUID sent with each upload so the server can group your matches together. Resetting it makes future uploads count as a different player."/>
+                               TextWrapping="Wrap"
+                               Text="Random ID sent with each upload so the server can group your matches together. It is not tied to your Steam, Epic, Discord or any other account."/>
+
+                    <TextBlock Classes="label" Text="YOUR DATA" Margin="0,12,0,4"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="RequestDataBtn" Content="Request my data"
+                                Click="RequestData_Click"/>
+                        <Button x:Name="DeleteDataBtn" Content="Delete my data"
+                                Click="DeleteData_Click"/>
+                    </StackPanel>
+                    <TextBlock Classes="caption" Margin="0,4,0,0"
+                               TextWrapping="Wrap"
+                               Text="Request a copy of everything the server has on file under your installation ID, or have it permanently deleted. Both actions require an internet connection and use the server endpoint above. Deleting only affects what is on the server. Your local match files in %AppData%\BCA-Tracker\matches\ are not touched."/>
+                    <TextBlock x:Name="DataActionStatusText"
+                               Classes="muted"
+                               FontFamily="Consolas, monospace"
+                               Margin="0,4,0,0"
+                               Text=""/>
 
                     <TextBlock Classes="label" Text="UPLOAD STATUS" Margin="0,12,0,4"/>
                     <TextBlock x:Name="UploadStatusText"
@@ -97,14 +108,80 @@
                             <TextBlock x:Name="ProfilePictureStatusText"
                                        Classes="muted"
                                        Margin="0,4,0,0"
-                                       Text="No picture set — using initial avatar"/>
+                                       Text="No picture set - using initial avatar"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button Content="Choose…" Click="ChoosePicture_Click"/>
+                            <Button Content="Choose..." Click="ChoosePicture_Click"/>
                             <Button Content="Clear" Margin="8,0,0,0" Click="ClearPicture_Click"/>
                         </StackPanel>
                     </Grid>
+
+                    <TextBlock Classes="label" Text="DISPLAY NAME" Margin="0,16,0,4"/>
+                    <TextBox x:Name="PlayerNameBox"
+                             Watermark="Leave blank to use the name read from BCA"
+                             LostFocus="PlayerName_LostFocus"/>
+                    <TextBlock Classes="caption" Margin="0,4,0,0"
+                               TextWrapping="Wrap"
+                               Text="Only used when the tracker can't read a name from BCA (game closed, no match played yet). If BCA is running, that name always wins."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Appearance -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Appearance" Margin="0,0,0,12"/>
+
+                    <TextBlock Classes="label" Text="ACCENT COLOR" Margin="0,0,0,4"/>
+                    <ComboBox x:Name="AccentColorCombo"
+                              SelectionChanged="AccentColor_Changed"
+                              HorizontalAlignment="Stretch">
+                        <ComboBoxItem Content="Purple" Tag="purple"/>
+                        <ComboBoxItem Content="Red"    Tag="red"/>
+                        <ComboBoxItem Content="Blue"   Tag="blue"/>
+                        <ComboBoxItem Content="Green"  Tag="green"/>
+                        <ComboBoxItem Content="Orange" Tag="orange"/>
+                        <ComboBoxItem Content="Teal"   Tag="teal"/>
+                        <ComboBoxItem Content="Yellow" Tag="yellow"/>
+                    </ComboBox>
+                    <TextBlock Classes="caption" Margin="0,4,0,0"
+                               Text="Changes apply immediately to buttons, badges, and highlights."/>
+
+                    <TextBlock Classes="label" Text="CHART COLORS" Margin="0,16,0,4"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Classes="caption"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"
+                                   Text="Trend graphs use per-metric up/down colors edited in chart-colors.json. Open the file, edit hex values, save - changes apply next time you open the Trends page."/>
+                        <Button Grid.Column="1"
+                                x:Name="ChartColorsOpenBtn"
+                                Content="Open config file"
+                                Margin="8,0,0,0"
+                                Click="ChartColorsOpen_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Behavior -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Behavior" Margin="0,0,0,12"/>
+
+                    <CheckBox x:Name="AutoJumpCheck"
+                              Content="Jump to Live Match automatically when a game starts"
+                              IsCheckedChanged="AutoJump_Changed"/>
+
+                    <TextBlock Classes="label" Text="WHEN I CLOSE THE WINDOW" Margin="0,16,0,4"/>
+                    <ComboBox x:Name="CloseBehaviorCombo"
+                              SelectionChanged="CloseBehavior_Changed"
+                              HorizontalAlignment="Stretch">
+                        <ComboBoxItem Content="Quit the app"                      Tag="quit"/>
+                        <ComboBoxItem Content="Minimize to system tray (keep running)" Tag="tray"/>
+                    </ComboBox>
+                    <TextBlock Classes="caption" Margin="0,4,0,0"
+                               TextWrapping="Wrap"
+                               Text="In tray mode the lobby publisher and Discord status keep running in the background. Right-click the tray icon to quit."/>
                 </StackPanel>
             </Border>
 

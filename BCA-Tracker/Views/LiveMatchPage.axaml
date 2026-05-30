@@ -22,8 +22,8 @@
 
                 <!-- Map / mode -->
                 <StackPanel Grid.Column="1" Margin="32,0,0,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="MapText"  Classes="section-title" Text="—"/>
-                    <TextBlock x:Name="ModeText" Classes="label" Margin="0,2,0,0" Text="—"/>
+                    <TextBlock x:Name="MapText"  Classes="section-title" Text="-"/>
+                    <TextBlock x:Name="ModeText" Classes="label" Margin="0,2,0,0" Text="-"/>
                 </StackPanel>
 
                 <!-- Match timer -->
@@ -33,7 +33,7 @@
                                Classes="stat-mid"
                                FontSize="22"
                                HorizontalAlignment="Right"
-                               Text="—"/>
+                               Text="-"/>
                 </StackPanel>
 
                 <!-- Lives left, Team A -->
@@ -43,7 +43,7 @@
                                Classes="stat-mid good"
                                FontSize="22"
                                HorizontalAlignment="Right"
-                               Text="—"/>
+                               Text="-"/>
                 </StackPanel>
 
                 <!-- Lives left, Team B -->
@@ -53,7 +53,7 @@
                                Classes="stat-mid danger"
                                FontSize="22"
                                HorizontalAlignment="Right"
-                               Text="—"/>
+                               Text="-"/>
                 </StackPanel>
             </Grid>
         </Border>

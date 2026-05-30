@@ -130,7 +130,7 @@ public sealed class DiscordPresenceService : IDisposable
     void OnReady(object? sender, ReadyMessage msg)
     {
         _connected = true;
-        DiagLog.Write($"[Discord] OnReady — connected as {msg.User?.Username ?? "?"}");
+        DiagLog.Write($"[Discord] OnReady - connected as {msg.User?.Username ?? "?"}");
         // Re-push the last presence so a reconnect doesn't leave the user
         // with a blank profile.
         if (_lastPresence is not null)

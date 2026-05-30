@@ -17,11 +17,18 @@ namespace BCATracker.Core
     /// • Watches every player's HitHistory + Deaths counter.
     /// • When Deaths increments AND HitHistory is non-empty: read the last
     ///   HitInfo entry, resolve its InstigatorID to a player, that's the
-    ///   killer.
+    ///   killer. Then inspect Weapon/Ability bytes to classify the kill:
+    ///     - Ability != 0  -> ability kill
+    ///     - Weapon  != 0  -> weapon kill
+    ///     - Both    == 0  -> environment kill (knocked into kill grid)
     /// • When Deaths increments AND HitHistory is empty: tag the death as
-    ///   environment / suicide.
+    ///   environment / suicide (player jumped off; no hit recorded).
+    /// • Bot InstigatorIDs are negative (e.g. -101). The mapping from
+    ///   InstigatorID to PlayerState is learned passively by reading the
+    ///   TargetID field of every hit entry across the session - within a
+    ///   few hits the mapping is complete.
     /// • State (prevStats, prevHitCount, instigatorMap) is NOT cleared
-    ///   between matches. It accumulates across the session — alpha
+    ///   between matches. It accumulates across the session - alpha
     ///   relies on this and we shouldn't break it.
     /// </summary>
     public class KillFeedTracker
@@ -470,7 +477,7 @@ namespace BCATracker.Core
                     else
                     {
                         // Hit history empty — pure environment death.
-                        DiagLog.Write($"[KillFeed] victim={victim.Name} histCount=0 — environment");
+                        DiagLog.Write($"[KillFeed] victim={victim.Name} histCount=0 - environment");
                         entry = new KillFeedEntry
                         {
                             Time          = DateTime.Now,

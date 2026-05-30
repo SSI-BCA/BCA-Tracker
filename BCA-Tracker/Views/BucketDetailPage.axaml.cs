@@ -163,7 +163,13 @@ public partial class BucketDetailPage : UserControl
         if (Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<MainWindow>(this) is MainWindow win)
         {
             // Go back to whichever index page (Maps or Weapons) we came from.
-            win.NavigateTo(_kind == BucketDetailKind.Map ? typeof(MapsPage) : typeof(WeaponsPage));
+            // Both Maps and Weapons live under the unified Stats page
+            // now. We set the initial tab so the user lands back on
+            // the same view they came from, then navigate.
+            StatsPage.InitialTab = _kind == BucketDetailKind.Map
+                ? StatsPage.StatsTab.Maps
+                : StatsPage.StatsTab.Weapons;
+            win.NavigateTo(typeof(StatsPage));
         }
     }
 

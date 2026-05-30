@@ -88,5 +88,25 @@ namespace BCATracker.Core
         /// stays quiet.
         /// </summary>
         public bool LocalPlayerIsHost { get; set; }
+
+        /// <summary>
+        /// Tracker-side password to gate joining. The host enters this in
+        /// the Lobbies page; the publisher sends it to the backend, which
+        /// bcrypts it and verifies on /v1/nb/lobbies/{groupId}/join. This
+        /// is independent of any in-game BCA lobby password.
+        ///
+        /// Empty string = no tracker-side password. We never persist this
+        /// to disk; it lives only in memory for the current session.
+        /// </summary>
+        public string Password { get; set; } = "";
+
+        /// <summary>
+        /// True if the host marked this lobby as "hidden". Hidden lobbies
+        /// are still uploaded and joinable, but excluded from the public
+        /// GET /v1/lobbies list. Joiners need the NetBird group id (the
+        /// lobby's "join id") to find it. Like Password, this lives only
+        /// in memory.
+        /// </summary>
+        public bool Hidden { get; set; }
     }
 }

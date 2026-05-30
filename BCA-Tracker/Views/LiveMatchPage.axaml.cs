@@ -85,7 +85,7 @@ public partial class LiveMatchPage : UserControl
         }
         else if (snap.IsWaiting)
         {
-            MapText.Text  = "Loading…";
+            MapText.Text  = "Loading...";
             ModeText.Text = snap.StateName;
         }
         else

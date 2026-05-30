@@ -1,25 +1,25 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="BCATracker.UI.Views.WeaponsPage">
+             x:Class="BCATracker.UI.Views.RivalsPage">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="32,0,32,32" MaxWidth="1280" HorizontalAlignment="Stretch">
-            <TextBlock x:Name="PageTitleText" Classes="page-title" Text="Weapons"/>
+            <TextBlock x:Name="PageTitleText" Classes="page-title" Text="Rivals"/>
             <TextBlock x:Name="SubtitleText" Classes="muted" Margin="0,4,0,24"/>
 
-            <ItemsControl x:Name="CardsHost" Margin="0,-8">
+            <TextBlock x:Name="EmptyHintText"
+                       Classes="muted"
+                       Text="No kill feed data yet. Rivals will appear here once you've played a few matches with the same opponents."
+                       IsVisible="False"
+                       Margin="0,0,0,16"/>
+
+            <ItemsControl x:Name="RivalsHost">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <StackPanel/>
+                        <StackPanel Spacing="8"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemContainerTheme>
-                    <ControlTheme TargetType="ContentPresenter">
-                        <Setter Property="Margin" Value="0,8"/>
-                    </ControlTheme>
-                </ItemsControl.ItemContainerTheme>
             </ItemsControl>
-
         </StackPanel>
     </ScrollViewer>
 </UserControl>

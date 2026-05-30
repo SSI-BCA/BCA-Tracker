@@ -192,7 +192,7 @@ public sealed class LobbyHostingService : IDisposable
         {
             if (_lobbyMissingSince != DateTime.MinValue)
             {
-                DiagLog.Write($"[LobbyHost] lobby data reappeared after {(DateTime.UtcNow - _lobbyMissingSince).TotalSeconds:F1}s — clearing match-hold grace");
+                DiagLog.Write($"[LobbyHost] lobby data reappeared after {(DateTime.UtcNow - _lobbyMissingSince).TotalSeconds:F1}s - clearing match-hold grace");
                 _lobbyMissingSince = DateTime.MinValue;
                 _suspectInMatch = false;
             }
@@ -219,7 +219,7 @@ public sealed class LobbyHostingService : IDisposable
             {
                 _lobbyMissingSince = DateTime.UtcNow;
                 _suspectInMatch = inMatch;
-                DiagLog.Write($"[LobbyHost] lobby data gone (inMatch={inMatch}) — entering match-hold grace, keeping NetBird up");
+                DiagLog.Write($"[LobbyHost] lobby data gone (inMatch={inMatch}) - entering match-hold grace, keeping NetBird up");
             }
             else if (inMatch && !_suspectInMatch)
             {
@@ -227,7 +227,7 @@ public sealed class LobbyHostingService : IDisposable
                 // the disappearance was a match transition, not a
                 // user leaving.
                 _suspectInMatch = true;
-                DiagLog.Write("[LobbyHost] match started — holding NetBird tunnel alive for the duration");
+                DiagLog.Write("[LobbyHost] match started - holding NetBird tunnel alive for the duration");
             }
 
             // Hard limit: if the lobby has been gone for longer than a
@@ -245,8 +245,8 @@ public sealed class LobbyHostingService : IDisposable
             // tear down, don't retry, just hold the tunnel.
             if (_state == State.Advertising)
                 StatusText = inMatch
-                    ? $"In match — VPN active at {ExternalEndpoint}"
-                    : $"Lobby paused — holding VPN at {ExternalEndpoint}";
+                    ? $"In match. VPN active at {ExternalEndpoint}"
+                    : $"Lobby paused. Holding VPN at {ExternalEndpoint}";
             return;
         }
 
@@ -290,7 +290,7 @@ public sealed class LobbyHostingService : IDisposable
 
         _state = State.Provisioning;
         _lastAttempt = DateTime.UtcNow;
-        StatusText = "Preparing NetBird…";
+        StatusText = "Preparing NetBird...";
 
         if (!_nb.IsInstalled)
         {
@@ -311,7 +311,7 @@ public sealed class LobbyHostingService : IDisposable
         }
 
         // Ask the backend to provision the lobby's NetBird resources.
-        StatusText = "Creating lobby network…";
+        StatusText = "Creating lobby network...";
         string hostProfileId = !string.IsNullOrEmpty(_lastSeenLobby?.LocalPlayerProfileId)
             ? _lastSeenLobby.LocalPlayerProfileId
             : _settings.AnonymousAccountId;
@@ -331,22 +331,22 @@ public sealed class LobbyHostingService : IDisposable
         DiagLog.Write($"[LobbyHost] #{attempt} got groupId={lobbyRes.GroupId} mgmt={lobbyRes.ManagementUrl} keyLen={lobbyRes.SetupKey?.Length ?? 0}");
 
         // Enroll the local agent.
-        StatusText = "Joining lobby network…";
+        StatusText = "Joining lobby network...";
         var t1 = DateTime.UtcNow;
-        DiagLog.Write($"[LobbyHost] #{attempt} netbird up…");
+        DiagLog.Write($"[LobbyHost] #{attempt} netbird up...");
         if (!await _nb.UpAsync(lobbyRes.ManagementUrl, lobbyRes.SetupKey ?? ""))
         {
             _state = State.Failed;
             StatusText = "NetBird enrollment failed.";
-            DiagLog.Write($"[LobbyHost] #{attempt} FAIL@up: netbird up returned false (took {(DateTime.UtcNow - t1).TotalMilliseconds:F0}ms) — see [NB] stderr lines above");
+            DiagLog.Write($"[LobbyHost] #{attempt} FAIL@up: netbird up returned false (took {(DateTime.UtcNow - t1).TotalMilliseconds:F0}ms) - see [NB] stderr lines above");
             return;
         }
         DiagLog.Write($"[LobbyHost] #{attempt} netbird up ok ({(DateTime.UtcNow - t1).TotalMilliseconds:F0}ms)");
 
         // Wait for IP assignment.
-        StatusText = "Waiting for IP assignment…";
+        StatusText = "Waiting for IP assignment...";
         var t2 = DateTime.UtcNow;
-        DiagLog.Write($"[LobbyHost] #{attempt} waiting for NetBird IP (up to 30s)…");
+        DiagLog.Write($"[LobbyHost] #{attempt} waiting for NetBird IP (up to 30s)...");
         string ip = await _nb.WaitForAssignedIPAsync(30);
         if (string.IsNullOrEmpty(ip))
         {
@@ -375,10 +375,19 @@ public sealed class LobbyHostingService : IDisposable
     LobbyInfo BuildInfo(LobbyData lobby, string hostName)
     {
         // Prefer the lobby's just-read PlayerNamePrivate; the
-        // scoreboard-derived hostName is empty pre-match.
-        string effectiveHost = !string.IsNullOrEmpty(lobby.LocalPlayerName)
-            ? lobby.LocalPlayerName
-            : (string.IsNullOrEmpty(hostName) ? "Player" : hostName);
+        // scoreboard-derived hostName is empty pre-match. If neither
+        // is available (BCA closed, or the read returned nothing),
+        // fall back to a name the user typed into Settings. Last
+        // resort is the literal "Player" so we never advertise a
+        // blank handle.
+        string effectiveHost =
+            !string.IsNullOrEmpty(lobby.LocalPlayerName) ? lobby.LocalPlayerName :
+            !string.IsNullOrEmpty(hostName)             ? hostName :
+            !string.IsNullOrEmpty(_settings.PlayerNameOverride) ? _settings.PlayerNameOverride :
+                                                          "Player";
+
+        string trackerPw = _settings.LobbyPassword ?? "";
+        bool effectiveHasPassword = lobby.HasPassword || !string.IsNullOrEmpty(trackerPw);
 
         return new()
         {
@@ -393,11 +402,13 @@ public sealed class LobbyHostingService : IDisposable
             GameModeRowName    = lobby.ModeName,
             MaxTeamSize        = lobby.MaxTeamSize,
             CurrentPlayerCount = lobby.CurrentPlayerCount,
-            HasPassword        = lobby.HasPassword,
+            HasPassword        = effectiveHasPassword,
+            Hidden             = _settings.LobbyHidden,
             HostExternalIP     = _currentVirtualIP,
             HostExternalPort   = BcaPort,
             NetBirdGroupId     = _currentGroupId,
             LocalPlayerIsHost  = true,
+            Password           = trackerPw,
         };
     }
 
@@ -434,9 +445,9 @@ public sealed class LobbyHostingService : IDisposable
     /// Returns the host's virtual IP they should paste into BCA, or
     /// empty on failure.
     /// </summary>
-    public async Task<string> JoinLobbyAsync(LobbyInfo lobby, CancellationToken ct = default)
+    public async Task<string> JoinLobbyAsync(LobbyInfo lobby, string password = "", CancellationToken ct = default)
     {
-        DiagLog.Write($"[LobbyHost] JoinLobbyAsync: groupId={lobby.NetBirdGroupId} host={lobby.HostName} ip={lobby.HostExternalIP}");
+        DiagLog.Write($"[LobbyHost] JoinLobbyAsync: groupId={lobby.NetBirdGroupId} host={lobby.HostName} ip={lobby.HostExternalIP} pwLen={password?.Length ?? 0}");
 
         if (!_nb.IsInstalled)
         {
@@ -456,21 +467,29 @@ public sealed class LobbyHostingService : IDisposable
             return "";
         }
 
-        // Fetch the setup key from the backend.
+        // Fetch the setup key from the backend. If the lobby is
+        // password-protected the body carries the plaintext; the
+        // backend bcrypt-compares against its stored hash before
+        // releasing the key.
         JoinResponse? joinRes;
         try
         {
             DiagLog.Write($"[LobbyHost] Join: POST {endpoint}/v1/nb/lobbies/{lobby.NetBirdGroupId}/join");
+            HttpContent? content = null;
+            if (!string.IsNullOrEmpty(password))
+            {
+                content = System.Net.Http.Json.JsonContent.Create(new { password });
+            }
             using var resp = await _http.PostAsync(
                 $"{endpoint}/v1/nb/lobbies/{lobby.NetBirdGroupId}/join",
-                content: null, cancellationToken: ct);
+                content: content, cancellationToken: ct);
             if (!resp.IsSuccessStatusCode)
             {
                 string respBody = "";
                 try
                 {
                     respBody = await resp.Content.ReadAsStringAsync(ct);
-                    if (respBody.Length > 512) respBody = respBody.Substring(0, 512) + "…";
+                    if (respBody.Length > 512) respBody = respBody.Substring(0, 512) + "...";
                 }
                 catch { }
                 DiagLog.Write($"[LobbyHost] Join HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}: {respBody}");
@@ -491,7 +510,7 @@ public sealed class LobbyHostingService : IDisposable
         DiagLog.Write($"[LobbyHost] Join: got setup key (len={joinRes.SetupKey.Length}) mgmt={joinRes.ManagementUrl}");
 
         // Enroll locally.
-        DiagLog.Write("[LobbyHost] Join: netbird up…");
+        DiagLog.Write("[LobbyHost] Join: netbird up...");
         if (!await _nb.UpAsync(joinRes.ManagementUrl, joinRes.SetupKey, ct))
         {
             DiagLog.Write("[LobbyHost] Join: netbird up failed");

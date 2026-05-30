@@ -135,9 +135,11 @@ namespace BCATracker.Core
                     MaxTeamSize        = snapshot.MaxTeamSize,
                     CurrentPlayerCount = snapshot.CurrentPlayerCount,
                     HasPassword        = snapshot.HasPassword,
+                    Hidden             = snapshot.Hidden,
                     HostExternalIP     = snapshot.HostExternalIP,
                     HostExternalPort   = snapshot.HostExternalPort,
-                    NetBirdGroupId  = snapshot.NetBirdGroupId,
+                    NetBirdGroupId     = snapshot.NetBirdGroupId,
+                    Password           = string.IsNullOrEmpty(snapshot.Password) ? null : snapshot.Password,
                 };
                 using var resp = await _http.PostAsJsonAsync(
                     $"{endpoint}/v1/lobbies", body).ConfigureAwait(false);
@@ -186,9 +188,10 @@ namespace BCATracker.Core
                         MaxTeamSize        = r.MaxTeamSize,
                         CurrentPlayerCount = r.CurrentPlayerCount,
                         HasPassword        = r.HasPassword,
+                        Hidden             = r.Hidden,
                         HostExternalIP     = r.HostExternalIP     ?? "",
                         HostExternalPort   = r.HostExternalPort,
-                        NetBirdGroupId  = r.NetBirdGroupId  ?? "",
+                        NetBirdGroupId     = r.NetBirdGroupId     ?? "",
                     });
                 }
                 return result;
@@ -198,6 +201,45 @@ namespace BCATracker.Core
                 LastError = ex.Message;
                 DiagLog.Write($"[LobbyPub] Fetch failed: {ex.Message}");
                 return new();
+            }
+        }
+
+        /// <summary>
+        /// Fetch a single lobby by its NetBird group id. Used by the
+        /// "Join by ID" flow to find hidden lobbies that the public
+        /// list doesn't return. Returns null if not found.
+        /// </summary>
+        public async Task<LobbyInfo?> FetchByGroupIdAsync(string endpoint, string groupId, CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(groupId)) return null;
+            endpoint = endpoint.TrimEnd('/');
+            try
+            {
+                using var resp = await _http.GetAsync(
+                    $"{endpoint}/v1/lobbies/by-group/{groupId}", ct).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode) return null;
+                var r = await resp.Content.ReadFromJsonAsync<LobbyPostBody>(cancellationToken: ct).ConfigureAwait(false);
+                if (r is null) return null;
+                return new LobbyInfo
+                {
+                    HostProfileId      = r.HostProfileId      ?? "",
+                    HostName           = r.HostName           ?? "",
+                    LobbyName          = r.LobbyName          ?? "",
+                    MapRowName         = r.MapRowName         ?? "",
+                    GameModeRowName    = r.GameModeRowName    ?? "",
+                    MaxTeamSize        = r.MaxTeamSize,
+                    CurrentPlayerCount = r.CurrentPlayerCount,
+                    HasPassword        = r.HasPassword,
+                    Hidden             = r.Hidden,
+                    HostExternalIP     = r.HostExternalIP     ?? "",
+                    HostExternalPort   = r.HostExternalPort,
+                    NetBirdGroupId     = r.NetBirdGroupId     ?? "",
+                };
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[LobbyPub] FetchByGroupId failed: {ex.Message}");
+                return null;
             }
         }
 
@@ -221,9 +263,19 @@ namespace BCATracker.Core
             [JsonPropertyName("maxTeamSize")]        public int     MaxTeamSize      { get; set; }
             [JsonPropertyName("currentPlayerCount")] public int     CurrentPlayerCount { get; set; }
             [JsonPropertyName("hasPassword")]        public bool    HasPassword      { get; set; }
+            [JsonPropertyName("hidden")]             public bool    Hidden           { get; set; }
             [JsonPropertyName("hostExternalIP")]     public string? HostExternalIP   { get; set; }
             [JsonPropertyName("hostExternalPort")]   public int     HostExternalPort { get; set; }
             [JsonPropertyName("netBirdGroupId")]  public string? NetBirdGroupId { get; set; }
+
+            /// <summary>Plaintext password. Sent only on first publish
+            /// or when the host changes it; subsequent heartbeats omit
+            /// this so the backend doesn't re-bcrypt on every tick.
+            /// The JSON serializer drops null/empty values from the
+            /// wire when this property is null.</summary>
+            [JsonPropertyName("password")]
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string? Password { get; set; }
         }
     }
 }

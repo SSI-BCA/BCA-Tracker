@@ -15,8 +15,8 @@
 
     <!-- Versioning. Bump VersionPrefix on releases; VersionSuffix marks
          the build channel. -->
-    <VersionPrefix>0.15.0</VersionPrefix>
-    <VersionSuffix>beta1</VersionSuffix>
+    <VersionPrefix>1.1.0</VersionPrefix>
+    <VersionSuffix>ea2</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>

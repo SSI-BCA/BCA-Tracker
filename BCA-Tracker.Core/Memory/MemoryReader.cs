@@ -27,11 +27,9 @@ namespace BCATracker.Core
         const int PROCESS_QUERY_INFO = 0x0400;
         const uint LIST_MODULES_ALL = 0x03;
 
-        // Standard UE5 UObject layout
-        // +0x00 VTable  +0x08 ObjectFlags  +0x0C InternalIndex
-        // +0x10 ClassPrivate (UClass*)  +0x18 NamePrivate (FName)  +0x20 OuterPrivate
-        const int UObj_ClassPrivate = 0x10;
-        const int UObj_NamePrivate = 0x18;
+        // UObject layout constants live in Offsets.cs (Offsets.UObj_*).
+        // They're referenced from here when resolving a UObject's class
+        // name via FNameResolver.
 
         IntPtr _handle = IntPtr.Zero;
         long _modBase = 0;
@@ -111,26 +109,36 @@ namespace BCATracker.Core
             //                      heap junk lives next door).
             //
             //  Tier 2 (fallback):  structural fingerprint, used only if class
-            //                      resolution fails (e.g. FNameResolver hasn't
-            //                      bootstrapped yet, or the UClass FName isn't
-            //                      one we recognise).
+            //                      resolution fails. The key signal is the
+            //                      byte at GameState+0x369:
+            //                        - ArenaTeamGS_C uses it as CurrentGameState
+            //                          (0..15 enum values).
+            //                        - CustomGameGS_C has a delegate there -
+            //                          reads garbage / values >15.
             //
             // Both CustomGameGS_C and ArenaTeamGS_C derivatives extend
             // AGameState, so they share the engine PlayerArray at 0x2A8/0x2B0.
             //
             //  CustomGameGS_C (lobby):
             //   +0x328  ArenaRowName     FName  (>=0x100 once a map is picked)
+            //   +0x330  PreviousGameMode FName  (informational)
             //   +0x338  GameModeRowName  FName  (>=0x100 once a mode is picked)
+            //   +0x3D0  LobbyPassword    FGuid  (16 bytes; 0 if no password)
+            //   +0x418  MaxTeamSize      int32
+            //   +0x41C  MaxSpectatorSize int32
             //   total size: 0x430 bytes
             //
             //  ArenaTeamGS_C and derivatives (in-match):
             //   +0x368  HasToCountDownBeforeStart (bool, 0 or 1)
-            //   +0x369  CurrentGameState (EGameState, 0..13)
+            //   +0x369  CurrentGameState (EGameState, 0..15 - the discriminator)
             //   +0x3B0  CurrentGameMode  (EGameMode,  0..12)
-            //   +0x328  NbPlayersPerTeam (int32, typically 1..3) — NOT FName-shaped
+            //   +0x3C8  WinnerTeam       (int32)
+            //   +0x328  NbPlayersPerTeam (int32, typically 1..3) - NOT FName-shaped
+            //   +0x538  MatchID          (FString, server-assigned)
+            //   +0x568  IsRanked         (bool)
             //   total size: 0x708+ bytes
             //
-            //  MainMenuGS_C: only 0x308 bytes — reads beyond that return heap junk.
+            //  MainMenuGS_C: only 0x308 bytes - reads beyond that return heap junk.
 
             int playerCount   = ReadInt (gameState + Offsets.GS_PlayerArray_Count);
             int arenaFNameIdx = ReadInt (gameState + Offsets.CGS_ArenaRowName);
@@ -287,10 +295,10 @@ namespace BCATracker.Core
         {
             if (objPtr == 0 || resolver == null) return null;
 
-            long classPtr = ReadLong(objPtr + UObj_ClassPrivate);
+            long classPtr = ReadLong(objPtr + Offsets.UObj_ClassPrivate);
             if (classPtr == 0) return null;
 
-            int nameIndex = ReadInt(classPtr + UObj_NamePrivate);
+            int nameIndex = ReadInt(classPtr + Offsets.UObj_NamePrivate);
             if (nameIndex == 0) return null;
 
             // Cache hit: same GS object, same class FName as last tick.

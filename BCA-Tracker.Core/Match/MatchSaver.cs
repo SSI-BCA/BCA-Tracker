@@ -42,7 +42,7 @@ namespace BCATracker.Core
                 "BCA-Tracker");
             _saveDir = Path.Combine(hub, "matches");
             Directory.CreateDirectory(_saveDir);
-            DiagLog.Write($"[Saver] Started — saveDir={_saveDir}" +
+            DiagLog.Write($"[Saver] Started - saveDir={_saveDir}" +
                           (_uploader != null ? " (uploader attached)" : ""));
         }
 
@@ -50,7 +50,7 @@ namespace BCATracker.Core
         {
             if (snap == null)
             {
-                DiagLog.Write("[Saver] Tick(null) — process gone");
+                DiagLog.Write("[Saver] Tick(null) - process gone");
                 if (_lastPostMatchSnap != null)
                 {
                     DiagLog.Write("[Saver] Saving pending post-match snap on process exit");
@@ -87,17 +87,35 @@ namespace BCATracker.Core
             if (snap.IsPostMatch)
             {
                 if (!_wasPostMatch)
-                    DiagLog.Write($"[Saver] Entered post-match — holding snap for save " +
+                    DiagLog.Write($"[Saver] Entered post-match - holding snap for save " +
                                   $"(map={_lobbyMapName ?? "null"} mode={_lobbyModeName ?? "null"} " +
                                   $"players={snap.Players?.Count ?? 0})");
-                _lastPostMatchSnap = snap;
+                // Keep the snap that has the most players. Human players
+                // (not bots) sometimes leave during the end-of-match
+                // screens (state 10..13); their APlayerState gets removed
+                // from GameState.PlayerArray and a naive "always replace"
+                // policy ends up saving an incomplete scoreboard.
+                // Tie-break on count goes to the newer snap so post-match
+                // stat updates (final K/D, time-alive, etc.) are
+                // preserved.
+                int newCount = snap.Players?.Count ?? 0;
+                int oldCount = _lastPostMatchSnap?.Players?.Count ?? -1;
+                if (newCount >= oldCount)
+                {
+                    _lastPostMatchSnap = snap;
+                }
+                else
+                {
+                    DiagLog.Write($"[Saver] Ignoring post-match tick with {newCount} players " +
+                                  $"(cached has {oldCount}) - a player likely left the lobby");
+                }
                 _wasPostMatch = true;
                 return;
             }
 
             if (_wasPostMatch && _lastPostMatchSnap != null)
             {
-                DiagLog.Write($"[Saver] Left post-match (now state={snap.StateName}) — saving");
+                DiagLog.Write($"[Saver] Left post-match (now state={snap.StateName}) - saving");
                 TrySave(_lastPostMatchSnap);
                 _lastPostMatchSnap = null;
                 _wasPostMatch = false;

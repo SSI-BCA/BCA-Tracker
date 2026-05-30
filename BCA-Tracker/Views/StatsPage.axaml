@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:v="clr-namespace:BCATracker.UI.Views"
+             x:Class="BCATracker.UI.Views.StatsPage">
+
+    <!--
+        Stats: segmented-button shell hosting Trends / Maps / Weapons.
+
+        We don't use a TabControl: the default Avalonia tab chrome
+        clashes with the rest of the UI and stacks awkwardly under
+        the page header. Instead we render the section switcher as
+        three ghost/active buttons (same visual language as the
+        metric pills on Trends) and swap the ContentControl's content
+        in code-behind when a section is clicked.
+
+        Future analysis sections (Loadouts, Rivals, Records, ...) go
+        in here as more buttons, not as new top-level nav items.
+    -->
+    <Grid RowDefinitions="Auto,*">
+
+        <StackPanel Grid.Row="0" Margin="32,24,32,8">
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                <TextBlock Grid.Column="0" Classes="page-title" Text="Stats"/>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button x:Name="SectionTrendsBtn"
+                            Content="Trends"
+                            Click="Section_Click"
+                            Tag="trends"
+                            Margin="0,0,4,0"/>
+                    <Button x:Name="SectionMapsBtn"
+                            Content="Maps"
+                            Click="Section_Click"
+                            Tag="maps"
+                            Margin="0,0,4,0"/>
+                    <Button x:Name="SectionWeaponsBtn"
+                            Content="Weapons"
+                            Click="Section_Click"
+                            Tag="weapons"
+                            Margin="0,0,4,0"/>
+                    <Button x:Name="SectionSessionsBtn"
+                            Content="Sessions"
+                            Click="Section_Click"
+                            Tag="sessions"
+                            Margin="0,0,4,0"/>
+                    <Button x:Name="SectionRecordsBtn"
+                            Content="Records"
+                            Click="Section_Click"
+                            Tag="records"
+                            Margin="0,0,4,0"/>
+                    <Button x:Name="SectionLoadoutsBtn"
+                            Content="Loadouts"
+                            Click="Section_Click"
+                            Tag="loadouts"
+                            Margin="0,0,4,0"/>
+                    <Button x:Name="SectionRivalsBtn"
+                            Content="Rivals"
+                            Click="Section_Click"
+                            Tag="rivals"/>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+
+        <ContentControl Grid.Row="1" x:Name="SectionHost"/>
+    </Grid>
+</UserControl>

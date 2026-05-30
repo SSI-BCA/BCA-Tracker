@@ -1,0 +1,98 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BCATracker.UI.Views.AboutPage">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,24,32,32" MaxWidth="1280" HorizontalAlignment="Stretch">
+
+            <TextBlock Classes="page-title" Text="About"/>
+
+            <!-- Project + version -->
+            <Border Classes="card" Margin="0,24,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="BCA-Tracker" Margin="0,0,0,12"/>
+                    <TextBlock Classes="caption" TextWrapping="Wrap"
+                               Text="A community-built companion app for Battle Core Arena. Reads scoreboard and kill-feed data live from the game, saves a JSON file per match, and gives you stats, trends, weapon and map breakdowns, and a custom-lobby browser that lets you connect to other players directly."/>
+
+                    <TextBlock Classes="label" Text="VERSION" Margin="0,16,0,4"/>
+                    <TextBlock x:Name="VersionText"
+                               FontFamily="Consolas, monospace"
+                               FontSize="13"
+                               Foreground="{DynamicResource Fg.Primary}"
+                               Text="(unknown)"/>
+
+                    <TextBlock Classes="label" Text="LINKS" Margin="0,16,0,4"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="GitHubBtn" Content="GitHub"
+                                Click="GitHub_Click"/>
+                        <Button x:Name="IssuesBtn" Content="Report a bug"
+                                Click="Issues_Click"/>
+                        <Button x:Name="ReleasesBtn" Content="Releases"
+                                Click="Releases_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Credits -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Credits" Margin="0,0,0,12"/>
+                    <Grid ColumnDefinitions="120,*">
+                        <TextBlock Grid.Column="0" Classes="label" Text="DEVELOPERS"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="puppetino"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Fg.Primary}"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- License & usage -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="License and usage" Margin="0,0,0,12"/>
+                    <TextBlock Classes="caption" TextWrapping="Wrap" Margin="0,0,0,8"
+                               Text="BCA-Tracker is open source under the GNU General Public License v3.0. The full source code is on GitHub, and the full license text is in the LICENSE file at the repository root."/>
+                    <TextBlock Classes="caption" TextWrapping="Wrap" Margin="0,0,0,8"
+                               Text="In plain English, GPLv3 means:"/>
+                    <StackPanel Margin="12,0,0,8" Spacing="4">
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="- You can use the tracker for free, for as long as you like."/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="- You can read the source code, learn from it, and fork it."/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="- You can share the installer with friends."/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="- If you distribute a modified version, you must also share your modifications under GPLv3 and make the source code available."/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="- The software comes with no warranty. If something breaks, that is on you."/>
+                    </StackPanel>
+                    <TextBlock Classes="caption" TextWrapping="Wrap" Margin="0,0,0,8"
+                               Text="On top of the license, please do not:"/>
+                    <StackPanel Margin="12,0,0,8" Spacing="4">
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="- Distribute modified builds that pretend to be the official BCA-Tracker. If you fork it, give it a different name."/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="- Use the tracker to cheat, harass other players, or violate the Battle Core Arena terms of service."/>
+                    </StackPanel>
+                    <TextBlock Classes="caption" TextWrapping="Wrap"
+                               Text="BCA-Tracker is an unofficial fan project and is not affiliated with or endorsed by the developers of Battle Core Arena. It reads data from the game's process memory locally, does not modify the game, and does not connect to the game's servers."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Disclaimer -->
+            <Border Classes="card" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="Data and privacy" Margin="0,0,0,12"/>
+                    <TextBlock Classes="caption" TextWrapping="Wrap" Margin="0,0,0,8"
+                               Text="The tracker only uploads match data if you opt in under Settings, Data submission. You can request a copy of everything the server has on you, or have it deleted permanently, from that same page."/>
+                    <TextBlock Classes="caption" TextWrapping="Wrap"
+                               Text="The 'Delete my data' button only affects what is stored on the server. Match files saved on your own machine under %AppData%\BCA-Tracker\matches\ are never touched. If you want to wipe those too, delete them from File Explorer."/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

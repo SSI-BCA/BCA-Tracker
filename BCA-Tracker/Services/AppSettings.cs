@@ -53,6 +53,32 @@ public class AppSettings
     [JsonPropertyName("discordClientId")]
     public string DiscordClientId { get; set; } = "";
 
+    // ── UX preferences ───────────────────────────────────────────────────────
+
+    /// <summary>If true, the tracker automatically navigates to the Live
+    /// Match page when a match starts. If false, the user stays on whatever
+    /// page they were viewing and has to switch manually.</summary>
+    [JsonPropertyName("autoJumpToLiveMatch")]
+    public bool AutoJumpToLiveMatch { get; set; } = true;
+
+    /// <summary>
+    /// Behavior when the user clicks the title-bar close button.
+    ///   - "quit"      : default. Application shuts down.
+    ///   - "tray"      : Window hides; app keeps running in the system tray
+    ///                   so background services (lobby publisher, Discord
+    ///                   RPC, match watcher) stay alive. Right-click tray
+    ///                   icon to quit.
+    /// </summary>
+    [JsonPropertyName("closeBehavior")]
+    public string CloseBehavior { get; set; } = "quit";
+
+    /// <summary>Accent color name. The Palette.axaml resource for
+    /// "Accent.*" gets swapped at runtime to match. Values:
+    /// "purple" (default), "red", "blue", "green", "orange", "teal",
+    /// "yellow". Unknown values fall back to purple.</summary>
+    [JsonPropertyName("accentColor")]
+    public string AccentColor { get; set; } = "purple";
+
     // ── Profile ──────────────────────────────────────────────────────────────
 
     /// <summary>Optional path to an image file used as the profile picture
@@ -94,9 +120,14 @@ public class AppSettings
     /// <summary>Base URL of the upload backend. Empty/null means the feature
     /// is dormant even if <see cref="DataSubmissionEnabled"/> is true (so
     /// builds without a configured backend can ship safely). The uploader
-    /// POSTs to {endpoint}/v1/matches.</summary>
+    /// POSTs to {endpoint}/v1/matches.
+    /// 
+    /// The default points at the official community server. Users can
+    /// override this in Settings; that takes precedence (and is the only
+    /// way to point at a private instance or a local dev backend).
+    /// </summary>
     [JsonPropertyName("dataSubmissionEndpoint")]
-    public string DataSubmissionEndpoint { get; set; } = "";
+    public string DataSubmissionEndpoint { get; set; } = "https://api-bca.puppetino.dev";
 
     /// <summary>Stable random GUID generated on first launch. Identifies the
     /// installation to the backend without revealing the underlying account.
@@ -138,6 +169,42 @@ public class AppSettings
     /// to "{hostName}'s lobby".</summary>
     [JsonPropertyName("lobbyAdvertisedName")]
     public string LobbyAdvertisedName { get; set; } = "";
+
+    /// <summary>
+    /// Optional password for the hosted lobby. When set, only joiners
+    /// who supply the matching password get a NetBird setup key from
+    /// the backend; the lobby still appears in the public list but
+    /// with a lock icon.
+    /// 
+    /// NOT persisted to settings.json: it's a per-session secret, the
+    /// host re-enters it each time they advertise. Survives across
+    /// app navigation but not a restart. The [JsonIgnore] attribute
+    /// keeps it out of the saved file even if the JSON serializer
+    /// were ever pointed at this class directly.
+    /// </summary>
+    [JsonIgnore]
+    public string LobbyPassword { get; set; } = "";
+
+    /// <summary>
+    /// True if the hosted lobby should be hidden from the public list.
+    /// The backend still has it on file (so joiners can find it by
+    /// group id), it's just not returned in GET /v1/lobbies. Not
+    /// persisted; like LobbyPassword, the host re-enables it per
+    /// session if they want a hidden lobby.
+    /// </summary>
+    [JsonIgnore]
+    public bool LobbyHidden { get; set; } = false;
+
+    /// <summary>
+    /// Manually-entered display name. Used as a fallback when the
+    /// tracker can't read a name from BCA (game closed, or no match
+    /// played yet so the scoreboard memory is empty). The in-game
+    /// read still wins when it's available - this is only the
+    /// "we have nothing else" fallback so hosts can advertise without
+    /// having to launch a match first.
+    /// </summary>
+    [JsonPropertyName("playerNameOverride")]
+    public string PlayerNameOverride { get; set; } = "";
 
     // ── Persistence ──────────────────────────────────────────────────────────
 

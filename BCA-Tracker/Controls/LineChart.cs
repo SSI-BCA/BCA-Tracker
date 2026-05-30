@@ -38,6 +38,23 @@ public class LineChart : Control
     string   _ySuffix  = "";
     IBrush?  _explicitLineBrush;
     IBrush?  _explicitFillBrush;
+    IBrush?  _upBrush;
+    IBrush?  _downBrush;
+
+    /// <summary>Optional per-point labels (e.g. match dates). Same
+    /// length as <see cref="_values"/>; shown in the hover tooltip.
+    /// </summary>
+    string[] _labels = Array.Empty<string>();
+
+    /// <summary>Last screen positions of the data points; populated
+    /// during Render and consumed by the hover handler. Avoids
+    /// recomputing geometry on every mouse move.</summary>
+    Point[] _pts = Array.Empty<Point>();
+
+    /// <summary>Index of the data point currently under the cursor,
+    /// or -1 when the cursor is outside the plot. Triggers a repaint
+    /// when set so the tooltip updates.</summary>
+    int _hoverIndex = -1;
 
     /// <summary>
     /// When true (default), an upward trend in the data is rendered as a
@@ -45,6 +62,15 @@ public class LineChart : Control
     /// Set to false for series where lower is better (deaths, time-to-die).
     /// </summary>
     public bool HigherIsBetter { get; set; } = true;
+
+    /// <summary>
+    /// When true, the line is drawn segment-by-segment in either the
+    /// <see cref="_upBrush"/> or <see cref="_downBrush"/> colour
+    /// depending on whether each segment goes up or down. Transitions
+    /// between adjacent segments of different colours blend smoothly
+    /// via per-segment LinearGradientBrushes. Set by SetDirectionalData.
+    /// </summary>
+    bool _directional;
 
     /// <summary>
     /// Whether to draw the dashed average reference line across the plot.
@@ -58,6 +84,16 @@ public class LineChart : Control
     /// </summary>
     public bool ShowLastValueBadge { get; set; } = true;
 
+    public LineChart()
+    {
+        // Pointer events let us show a per-point tooltip on hover. We
+        // don't use Avalonia's ToolTip because we want it positioned
+        // next to the *data point*, not the cursor, and styled to fit
+        // the chart aesthetic.
+        PointerMoved += OnPointerMoved;
+        PointerExited += OnPointerExited;
+    }
+
     public void SetData(
         IEnumerable<double> values,
         string yFormat = "0.00",
@@ -70,6 +106,82 @@ public class LineChart : Control
         _ySuffix = suffix;
         _explicitLineBrush = lineColor;
         _explicitFillBrush = fillColor;
+        _directional = false;
+        _upBrush = null;
+        _downBrush = null;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Same as SetData but with per-segment up/down colouring. Each
+    /// segment of the line is drawn in <paramref name="upColor"/> if
+    /// the segment goes higher than the previous point, or
+    /// <paramref name="downColor"/> if it goes lower. Segments that
+    /// straddle a direction change use a linear-gradient pen that
+    /// blends from the previous segment's colour to this one, giving
+    /// the line a soft handover instead of a hard step.
+    /// </summary>
+    public void SetDirectionalData(
+        IEnumerable<double> values,
+        IBrush upColor,
+        IBrush downColor,
+        string yFormat = "0.00",
+        string suffix  = "")
+    {
+        _values  = values.ToArray();
+        _yFormat = yFormat;
+        _ySuffix = suffix;
+        _upBrush   = upColor;
+        _downBrush = downColor;
+        _directional = true;
+        // Clear the single-color overrides so the directional branch
+        // wins at render time.
+        _explicitLineBrush = null;
+        _explicitFillBrush = null;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Set the per-point hover labels. Typical use: match dates, e.g.
+    /// "2026-05-20 14:33". Same order as the values array; missing
+    /// entries (shorter array) just don't show in the tooltip.
+    /// Call after SetData / SetDirectionalData.
+    /// </summary>
+    public void SetLabels(IEnumerable<string> labels)
+    {
+        _labels = labels.ToArray();
+        InvalidateVisual();
+    }
+
+    void OnPointerMoved(object? sender, Avalonia.Input.PointerEventArgs e)
+    {
+        if (_pts.Length == 0) { SetHover(-1); return; }
+        var pos = e.GetPosition(this);
+
+        // Nearest point in screen space. We use squared distance so we
+        // avoid Math.Sqrt for every comparison; the threshold is in
+        // squared units too. 25^2 = 625 means "within ~25 pixels".
+        int bestIdx = -1;
+        double bestSq = 625; // 25^2 pixel radius
+        for (int i = 0; i < _pts.Length; i++)
+        {
+            double dx = pos.X - _pts[i].X;
+            double dy = pos.Y - _pts[i].Y;
+            double sq = dx * dx + dy * dy;
+            if (sq < bestSq) { bestSq = sq; bestIdx = i; }
+        }
+        SetHover(bestIdx);
+    }
+
+    void OnPointerExited(object? sender, Avalonia.Input.PointerEventArgs e)
+    {
+        SetHover(-1);
+    }
+
+    void SetHover(int idx)
+    {
+        if (idx == _hoverIndex) return;
+        _hoverIndex = idx;
         InvalidateVisual();
     }
 
@@ -111,17 +223,29 @@ public class LineChart : Control
 
         // Decide line/fill colours: caller-provided > trend-based > accent default.
         IBrush lineBrush;
-        if (_explicitLineBrush is not null)
+        if (_directional && _upBrush is not null && _downBrush is not null)
+        {
+            // In directional mode, the actual line is drawn segment-
+            // by-segment in the loop further down. The `lineBrush`
+            // variable is still used for the fill area, the min/max
+            // rings, and the per-point dots; pick the overall trend
+            // direction's colour for those so they read as a single
+            // cohesive visual rather than fighting the line colour.
+            int trend = ComputeTrendDirection(_values);
+            lineBrush = trend >= 0 ? _upBrush : _downBrush;
+        }
+        else if (_explicitLineBrush is not null)
         {
             lineBrush = _explicitLineBrush;
         }
         else
         {
             int trend = ComputeTrendDirection(_values);  // -1, 0, +1
-            if (trend == 0)        lineBrush = accentBrush;
+            if (trend == 0) lineBrush = accentBrush;
             else if (HigherIsBetter ? trend > 0 : trend < 0)
-                                   lineBrush = goodBrush;
-            else                   lineBrush = dangerBrush;
+                lineBrush = goodBrush;
+            else
+                lineBrush = dangerBrush;
         }
         IBrush fillBrush = _explicitFillBrush ?? MakeTransparent(lineBrush, 0.18);
 
@@ -167,34 +291,167 @@ public class LineChart : Control
             double yFrac = (yMax - yMin) > 0 ? (_values[i] - yMin) / (yMax - yMin) : 0.5;
             pts[i] = new Point(plotL + xFrac * plotW, plotB - yFrac * plotH);
         }
+        // Cache for hit-testing in the pointer handlers.
+        _pts = pts;
 
         // Filled area under the line.
         if (pts.Length >= 2)
         {
-            var fig = new PathFigure
+            if (_directional && _upBrush is not null && _downBrush is not null)
             {
-                StartPoint = new Point(pts[0].X, plotB),
-                IsClosed   = true,
-                IsFilled   = true,
-            };
-            foreach (var p in pts)
-                fig.Segments!.Add(new LineSegment { Point = p });
-            fig.Segments.Add(new LineSegment { Point = new Point(pts[^1].X, plotB) });
-            var geo = new PathGeometry();
-            geo.Figures!.Add(fig);
-            ctx.DrawGeometry(fillBrush, null, geo);
+                // Mirror the per-segment colouring used for the line.
+                // For each segment we render a trapezoid from
+                // (pts[i-1].X, plotB) up to pts[i-1], across to pts[i],
+                // and back down to (pts[i].X, plotB). Same brush logic
+                // as the line below, but with reduced alpha so the
+                // line stays the visual lead.
+                IBrush?[] segBrush = new IBrush?[pts.Length - 1];
+                for (int i = 1; i < pts.Length; i++)
+                {
+                    bool segUp   = pts[i].Y < pts[i - 1].Y;
+                    bool segDown = pts[i].Y > pts[i - 1].Y;
+                    if (segUp)        segBrush[i - 1] = _upBrush;
+                    else if (segDown) segBrush[i - 1] = _downBrush;
+                    else              segBrush[i - 1] = i >= 2 ? segBrush[i - 2] : _upBrush;
+                }
+
+                for (int i = 1; i < pts.Length; i++)
+                {
+                    IBrush? prev = i >= 2 ? segBrush[i - 2] : segBrush[i - 1];
+                    IBrush  curr = segBrush[i - 1]!;
+                    IBrush fillForSeg;
+                    if (prev is not null && !ReferenceEquals(prev, curr))
+                    {
+                        // Direction change. Gradient from the previous
+                        // segment's colour to the current one, with the
+                        // same 0.18 alpha we use for static fills so
+                        // the area blends gently into the background.
+                        var prevC = ((SolidColorBrush)prev).Color;
+                        var currC = ((SolidColorBrush)curr).Color;
+                        fillForSeg = new LinearGradientBrush
+                        {
+                            StartPoint = new RelativePoint(pts[i - 1], RelativeUnit.Absolute),
+                            EndPoint   = new RelativePoint(pts[i],     RelativeUnit.Absolute),
+                            GradientStops =
+                            {
+                                new GradientStop(WithAlpha(prevC, 0.18), 0.0),
+                                new GradientStop(WithAlpha(currC, 0.18), 1.0),
+                            },
+                        };
+                    }
+                    else
+                    {
+                        fillForSeg = MakeTransparent(curr, 0.18);
+                    }
+
+                    var trap = new PathFigure
+                    {
+                        StartPoint = new Point(pts[i - 1].X, plotB),
+                        IsClosed   = true,
+                        IsFilled   = true,
+                    };
+                    trap.Segments!.Add(new LineSegment { Point = pts[i - 1] });
+                    trap.Segments.Add(new LineSegment { Point = pts[i] });
+                    trap.Segments.Add(new LineSegment { Point = new Point(pts[i].X, plotB) });
+                    var trapGeo = new PathGeometry();
+                    trapGeo.Figures!.Add(trap);
+                    ctx.DrawGeometry(fillForSeg, null, trapGeo);
+                }
+            }
+            else
+            {
+                // Original single-colour fill path.
+                var fig = new PathFigure
+                {
+                    StartPoint = new Point(pts[0].X, plotB),
+                    IsClosed   = true,
+                    IsFilled   = true,
+                };
+                foreach (var p in pts)
+                    fig.Segments!.Add(new LineSegment { Point = p });
+                fig.Segments.Add(new LineSegment { Point = new Point(pts[^1].X, plotB) });
+                var geo = new PathGeometry();
+                geo.Figures!.Add(fig);
+                ctx.DrawGeometry(fillBrush, null, geo);
+            }
         }
 
         // Line.
         if (pts.Length >= 2)
         {
-            var linePen = new Pen(lineBrush, 2)
+            if (_directional && _upBrush is not null && _downBrush is not null)
             {
-                LineJoin = PenLineJoin.Round,
-                LineCap  = PenLineCap.Round,
-            };
-            for (int i = 1; i < pts.Length; i++)
-                ctx.DrawLine(linePen, pts[i - 1], pts[i]);
+                // Per-segment colouring with smooth transitions.
+                //
+                // For each segment, decide its "intended" colour by
+                // looking at whether y went up (visually: y decreased,
+                // since screen y is flipped) or down. Adjacent segments
+                // that have different intended colours get a gradient
+                // pen so the visual jump is smoothed; same-direction
+                // adjacents use a flat brush so we avoid pointless
+                // gradient overhead.
+                IBrush?[] segBrush = new IBrush?[pts.Length - 1];
+                for (int i = 1; i < pts.Length; i++)
+                {
+                    // pts[i].Y < pts[i-1].Y means screen-y decreased,
+                    // which means the value went up. Equal -> use the
+                    // previous segment's colour to avoid a flicker.
+                    bool segUp = pts[i].Y < pts[i - 1].Y;
+                    bool segDown = pts[i].Y > pts[i - 1].Y;
+                    if (segUp)        segBrush[i - 1] = _upBrush;
+                    else if (segDown) segBrush[i - 1] = _downBrush;
+                    else              segBrush[i - 1] = i >= 2 ? segBrush[i - 2] : _upBrush;
+                }
+
+                for (int i = 1; i < pts.Length; i++)
+                {
+                    IBrush? prev = i >= 2 ? segBrush[i - 2] : segBrush[i - 1];
+                    IBrush  curr = segBrush[i - 1]!;
+                    IBrush  pen;
+                    if (prev is not null && !ReferenceEquals(prev, curr))
+                    {
+                        // Direction change at pts[i-1]. Use a linear
+                        // gradient that starts in the previous colour
+                        // and ends in the current one across this
+                        // segment. The next segment will draw entirely
+                        // in `curr`, so the transition spans roughly
+                        // one segment - short enough to look like a
+                        // smooth blend rather than a hard break.
+                        var lg = new LinearGradientBrush
+                        {
+                            StartPoint = new RelativePoint(pts[i - 1], RelativeUnit.Absolute),
+                            EndPoint   = new RelativePoint(pts[i],     RelativeUnit.Absolute),
+                            GradientStops =
+                            {
+                                new GradientStop(((SolidColorBrush)prev).Color, 0.0),
+                                new GradientStop(((SolidColorBrush)curr).Color, 1.0),
+                            },
+                        };
+                        pen = lg;
+                    }
+                    else
+                    {
+                        pen = curr;
+                    }
+                    var segPen = new Pen(pen, 2)
+                    {
+                        LineJoin = PenLineJoin.Round,
+                        LineCap  = PenLineCap.Round,
+                    };
+                    ctx.DrawLine(segPen, pts[i - 1], pts[i]);
+                }
+            }
+            else
+            {
+                // Original single-colour rendering path.
+                var linePen = new Pen(lineBrush, 2)
+                {
+                    LineJoin = PenLineJoin.Round,
+                    LineCap  = PenLineCap.Round,
+                };
+                for (int i = 1; i < pts.Length; i++)
+                    ctx.DrawLine(linePen, pts[i - 1], pts[i]);
+            }
         }
 
         // Min/max highlights — hollow rings on the extremes.
@@ -258,6 +515,69 @@ public class LineChart : Control
         // X-axis hints.
         DrawAt(ctx, "oldest", labelBrush, plotL,      plotB + 6);
         DrawAt(ctx, "newest", labelBrush, plotR - 32, plotB + 6);
+
+        // Hover tooltip. Drawn last so it overlays everything else.
+        if (_hoverIndex >= 0 && _hoverIndex < pts.Length)
+        {
+            var hp = pts[_hoverIndex];
+            string valueText = FormatY(_values[_hoverIndex]);
+            string labelText = _hoverIndex < _labels.Length ? _labels[_hoverIndex] : "";
+
+            // Highlight the hovered point: bigger filled ring on top
+            // of whatever was already drawn there.
+            ctx.DrawEllipse(fgBrush, null, hp, 4.5, 4.5);
+            ctx.DrawEllipse(lineBrush, null, hp, 3, 3);
+
+            // Build the tooltip text blocks.
+            var valFt = new FormattedText(
+                valueText,
+                CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new Typeface("Segoe UI", FontStyle.Normal, FontWeight.SemiBold),
+                13,
+                fgBrush);
+            FormattedText? labFt = null;
+            if (!string.IsNullOrEmpty(labelText))
+            {
+                labFt = new FormattedText(
+                    labelText,
+                    CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"),
+                    11,
+                    labelBrush);
+            }
+
+            // Tooltip box dimensions.
+            double pad = 8;
+            double textW = Math.Max(valFt.Width, labFt?.Width ?? 0);
+            double textH = valFt.Height + (labFt is not null ? labFt.Height + 2 : 0);
+            double boxW = textW + pad * 2;
+            double boxH = textH + pad * 2;
+
+            // Position above the point by default. If that would clip
+            // the top of the plot, position below instead.
+            double boxX = hp.X - boxW / 2;
+            double boxY = hp.Y - boxH - 12;
+            if (boxY < plotT) boxY = hp.Y + 12;
+            // Clamp horizontally so the box stays within the plot.
+            if (boxX < plotL) boxX = plotL;
+            if (boxX + boxW > plotR) boxX = plotR - boxW;
+
+            // Background: dark surface with the line/series colour as a
+            // 2px left accent stripe. Subtle border so the box reads
+            // against the chart background.
+            IBrush boxBg = new SolidColorBrush(Color.FromArgb(0xE0, 0x1F, 0x1F, 0x2A));
+            ctx.DrawRectangle(boxBg, new Pen(axisBrush, 1),
+                new Rect(boxX, boxY, boxW, boxH), 4, 4);
+            ctx.DrawRectangle(lineBrush, null,
+                new Rect(boxX, boxY, 2, boxH), 1, 1);
+
+            // Text content.
+            ctx.DrawText(valFt, new Point(boxX + pad, boxY + pad));
+            if (labFt is not null)
+                ctx.DrawText(labFt, new Point(boxX + pad, boxY + pad + valFt.Height + 2));
+        }
     }
 
     string FormatY(double v)
@@ -307,6 +627,15 @@ public class LineChart : Control
             return new SolidColorBrush(Color.FromArgb(alpha, c.R, c.G, c.B));
         }
         return new SolidColorBrush(Color.FromArgb(40, 0x8B, 0x5C, 0xF6));
+    }
+
+    /// <summary>Same idea as MakeTransparent but for a bare Color
+    /// value. Used by the gradient-fill code to bake the alpha into
+    /// each stop without allocating an intermediate brush.</summary>
+    static Color WithAlpha(Color c, double opacity)
+    {
+        byte alpha = (byte)Math.Clamp(opacity * 255.0, 0, 255);
+        return Color.FromArgb(alpha, c.R, c.G, c.B);
     }
 
     static void DrawAt(DrawingContext ctx, string text, IBrush brush, double x, double y)

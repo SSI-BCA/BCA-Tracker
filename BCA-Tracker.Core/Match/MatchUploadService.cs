@@ -295,7 +295,7 @@ namespace BCATracker.Core
                         await MoveToFailed(queuePath, $"http_{status}").ConfigureAwait(false);
                         Interlocked.Increment(ref _failedCount);
                         _lastError = $"server rejected ({status})";
-                        DiagLog.Write($"[Upload] Rejected {Path.GetFileName(queuePath)} ({status}) — moved to failed/");
+                        DiagLog.Write($"[Upload] Rejected {Path.GetFileName(queuePath)} ({status}) - moved to failed/");
                         return;
                     }
 
